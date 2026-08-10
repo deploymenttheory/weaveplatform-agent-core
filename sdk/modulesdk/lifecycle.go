@@ -55,6 +55,12 @@ func (s *moduleServer) Init(ctx context.Context, req *agentv1.InitRequest) (*age
 		return nil, status.Errorf(codes.FailedPrecondition, "protocol mismatch: negotiated %d, built for %d", req.GetProtocol(), Protocol)
 	}
 
+	if cr, ok := s.m.(ConfigReceiver); ok {
+		if err := cr.SetConfig(req.GetConfig()); err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "module config: %v", err)
+		}
+	}
+
 	host, err := s.connectHost()
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "connecting host services: %v", err)

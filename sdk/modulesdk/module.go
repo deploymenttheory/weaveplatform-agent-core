@@ -45,6 +45,13 @@ type Module interface {
 	Health() Health
 }
 
+// ConfigReceiver is optionally implemented by modules that take
+// configuration. The runtime calls SetConfig with the core-delivered
+// document (possibly empty) before Init; a returned error fails Init.
+type ConfigReceiver interface {
+	SetConfig(doc []byte) error
+}
+
 // Host is what core offers a module. It is closed by default: growing this
 // interface is an architecture decision, not a pull request.
 type Host interface {
