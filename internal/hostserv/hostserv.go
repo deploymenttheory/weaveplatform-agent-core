@@ -273,6 +273,7 @@ func (v *eventsServer) Subscribe(
 				Topic:         ev.Topic,
 				Data:          ev.Data,
 				PublishedAtMs: ev.PublishedAt.UnixMilli(),
+				Sequence:      ev.Sequence,
 			}); err != nil {
 				return err
 			}

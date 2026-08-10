@@ -6,6 +6,7 @@ package eventbus
 import (
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -16,32 +17,40 @@ type Event struct {
 	Topic       string
 	Data        []byte
 	PublishedAt time.Time
+	// Sequence is a monotonic per-topic counter stamped by the bus. A gap
+	// in a subscriber's received sequence for a topic means it missed
+	// events (delivery is at-most-once) and should re-pull state.
+	Sequence uint64
 }
 
 // Bus fans events out to subscribers.
 type Bus struct {
 	mu   sync.Mutex
 	subs map[*Subscription]struct{}
+	seq  map[string]uint64 // per-topic monotonic sequence
 }
 
 // New returns an empty bus.
 func New() *Bus {
-	return &Bus{subs: make(map[*Subscription]struct{})}
+	return &Bus{subs: make(map[*Subscription]struct{}), seq: make(map[string]uint64)}
 }
 
 // Publish stamps and delivers the event. from is the publishing module's
 // id and becomes the topic prefix; core is "core".
 func (b *Bus) Publish(from, topic string, data []byte) {
-	ev := Event{Topic: from + "." + topic, Data: data, PublishedAt: time.Now()}
+	fullTopic := from + "." + topic
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.seq[fullTopic]++
+	ev := Event{Topic: fullTopic, Data: data, PublishedAt: time.Now(), Sequence: b.seq[fullTopic]}
 	for s := range b.subs {
 		if s.matches(ev.Topic) {
 			select {
 			case s.ch <- ev:
 			default:
-				// At-most-once: a full subscriber loses this event.
-				s.dropped++
+				// At-most-once: a full subscriber loses this event. The
+				// gap is visible to it via the sequence.
+				s.dropped.Add(1)
 			}
 		}
 	}
@@ -49,15 +58,11 @@ func (b *Bus) Publish(from, topic string, data []byte) {
 
 // Subscription is one subscriber's feed.
 type Subscription struct {
-	bus     *Subscriptioner
+	bus     *Bus
 	topics  []string
 	ch      chan Event
-	dropped uint64
+	dropped atomic.Uint64
 }
-
-// Subscriptioner is an alias target keeping the struct self-contained; the
-// bus pointer is only needed for Close.
-type Subscriptioner = Bus
 
 // Subscribe registers for topics (exact, or prefix globs like "sysinfo.*")
 // with a buffered feed. Close the subscription when done.
@@ -71,6 +76,9 @@ func (b *Bus) Subscribe(topics ...string) *Subscription {
 
 // C is the event feed.
 func (s *Subscription) C() <-chan Event { return s.ch }
+
+// Dropped returns how many events this subscription lost to a full buffer.
+func (s *Subscription) Dropped() uint64 { return s.dropped.Load() }
 
 // Close unregisters the subscription.
 func (s *Subscription) Close() {
