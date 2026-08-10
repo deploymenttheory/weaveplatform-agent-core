@@ -169,16 +169,14 @@ func (p *Provider) WhoAmI() (string, bool, string) {
 	return p.ephemeral, true, ""
 }
 
-// Credential implements hostserv.IdentityBackend: an opaque token scoped
-// to the module. Until GateWeave defines token semantics this is a
-// core-minted random credential — the shape modules program against is
-// what matters.
+// Credential implements hostserv.IdentityBackend. It fails closed: until
+// GateWeave defines real, verifiable, issuer-signed token semantics (with
+// core deciding the granted subset, never echoing the request), minting a
+// forgeable token that merely looks scoped and expiring is worse than
+// none — it invites something downstream to trust it. Returning an error
+// keeps that contract honest.
 func (p *Provider) Credential(module string, scopes []string) (string, int64, []string, error) {
-	var b [16]byte
-	rand.Read(b[:]) //nolint:errcheck
-	deviceID, _, _ := p.WhoAmI()
-	token := "wv1." + deviceID + "." + module + "." + hex.EncodeToString(b[:])
-	return token, time.Now().Add(time.Hour).Unix(), scopes, nil
+	return "", 0, nil, fmt.Errorf("identity: scoped credentials are not yet implemented")
 }
 
 // Enrolled reports enrolment state for the control surface.

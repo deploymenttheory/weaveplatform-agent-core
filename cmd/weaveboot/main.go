@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
+	"github.com/deploymenttheory/weaveplatform-agent/internal/verify"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/weaveboot"
 	"github.com/deploymenttheory/weaveplatform-sdk/wlog"
 )
@@ -29,9 +30,10 @@ func main() {
 	// Everything after -- goes to weave-agent; the state dir always does.
 	agentArgs := append([]string{"--state-dir", lay.StateDir}, flag.Args()...)
 	err := weaveboot.Run(ctx, weaveboot.Options{
-		Log:       log,
-		CoreDir:   filepath.Join(lay.StateDir, "core"),
-		AgentArgs: agentArgs,
+		Log:        log,
+		CoreDir:    filepath.Join(lay.StateDir, "core"),
+		AgentArgs:  agentArgs,
+		VerifyCore: verify.Core(log),
 	})
 	if err != nil {
 		log.Error("weaveboot failed", "err", err)

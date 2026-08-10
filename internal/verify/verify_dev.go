@@ -17,3 +17,11 @@ func newVerifier(log *slog.Logger) supervise.Verifier {
 		return nil
 	})
 }
+
+// coreVerifier (dev builds only): accept any staged core, loudly.
+func coreVerifier(log *slog.Logger) func(string) error {
+	return func(path string) error {
+		log.Warn("DEV BUILD: core signature verification bypassed", "path", path)
+		return nil
+	}
+}

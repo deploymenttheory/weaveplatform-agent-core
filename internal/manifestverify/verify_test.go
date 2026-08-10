@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"testing"
+
+	"github.com/deploymenttheory/weaveplatform-api/manifest"
 )
 
 func makeBundle(t *testing.T) (ed25519.PublicKey, Bundle) {
@@ -25,7 +27,8 @@ func makeBundle(t *testing.T) (ed25519.PublicKey, Bundle) {
 	})
 	endorsement, _ := json.Marshal(map[string]any{ //nolint:errcheck
 		"schema": 1, "key_id": "root",
-		"signature": base64.StdEncoding.EncodeToString(ed25519.Sign(rootPriv, signingKeyFile)),
+		"signature": base64.StdEncoding.EncodeToString(
+			ed25519.Sign(rootPriv, manifest.SigningMessage(manifest.EndorseContext, signingKeyFile))),
 	})
 	manifestBytes, _ := json.Marshal(map[string]any{ //nolint:errcheck
 		"schema": 1, "channel": "stable", "generated_at": "2026-08-10T00:00:00Z",
@@ -35,7 +38,8 @@ func makeBundle(t *testing.T) (ed25519.PublicKey, Bundle) {
 	})
 	manifestSig, _ := json.Marshal(map[string]any{ //nolint:errcheck
 		"schema": 1, "key_id": "signing-2026",
-		"signature": base64.StdEncoding.EncodeToString(ed25519.Sign(signPriv, manifestBytes)),
+		"signature": base64.StdEncoding.EncodeToString(
+			ed25519.Sign(signPriv, manifest.SigningMessage(manifest.ManifestContext, manifestBytes))),
 	})
 	return rootPub, Bundle{
 		Manifest:      manifestBytes,
@@ -80,8 +84,18 @@ func TestVerifyRejectsTamper(t *testing.T) {
 	unendorsed.SigningKey = rogueKey
 	rogueSig, _ := json.Marshal(map[string]any{ //nolint:errcheck
 		"schema": 1, "key_id": "signing-2026",
-		"signature": base64.StdEncoding.EncodeToString(ed25519.Sign(otherPriv, b.Manifest)),
+		"signature": base64.StdEncoding.EncodeToString(
+			ed25519.Sign(otherPriv, manifest.SigningMessage(manifest.ManifestContext, b.Manifest))),
 	})
+
+	// Domain separation: a valid ROOT endorsement signature must not
+	// verify as a MANIFEST signature (different context), even reusing the
+	// same key material.
+	crossCtx := b
+	crossCtx.ManifestSig = b.SigningKeySig // endorsement sig in the manifest slot
+	if _, err := Verify(rootPub, crossCtx); err == nil {
+		t.Fatal("endorsement signature accepted as a manifest signature (no domain separation)")
+	}
 	unendorsed.ManifestSig = rogueSig
 	if _, err := Verify(rootPub, unendorsed); err == nil {
 		t.Fatal("rogue unendorsed signing key accepted")

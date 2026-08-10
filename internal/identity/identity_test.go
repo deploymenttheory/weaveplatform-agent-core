@@ -59,19 +59,16 @@ func TestEnrolmentAndPersistence(t *testing.T) {
 	}
 }
 
-func TestCredentialScopedToModule(t *testing.T) {
+func TestCredentialFailsClosed(t *testing.T) {
 	p := &Provider{Log: testLog(), Store: hostserv.NewMemStore()}
 	if err := p.Init(); err != nil {
 		t.Fatal(err)
 	}
-	token, exp, granted, err := p.Credential("sysinfo", []string{"telemetry:write"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(token, ".sysinfo.") {
-		t.Errorf("token %q not scoped to module", token)
-	}
-	if exp == 0 || len(granted) != 1 {
-		t.Errorf("exp=%d granted=%v", exp, granted)
+	// Until real, verifiable, issuer-signed semantics exist, Credential
+	// must fail closed rather than mint a forgeable token that echoes the
+	// requested scopes as granted.
+	token, _, granted, err := p.Credential("sysinfo", []string{"telemetry:write"})
+	if err == nil {
+		t.Fatalf("Credential returned a token (%q, granted=%v); it must fail closed", token, granted)
 	}
 }

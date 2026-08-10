@@ -92,6 +92,7 @@ func TestStagedPromoteAndCrashLoopRevert(t *testing.T) {
 			StableAfter:     5 * time.Second,
 			RevertThreshold: 3,
 			Backoff:         50 * time.Millisecond,
+			VerifyCore:      func(string) error { return nil }, // test verifier
 		})
 	}()
 

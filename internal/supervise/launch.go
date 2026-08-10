@@ -74,7 +74,7 @@ func (r *runner) launch(ctx context.Context) (*proc, error) {
 	if err != nil {
 		return nil, fmt.Errorf("host listener: %w", err)
 	}
-	hostSrv := r.sup.Services.NewServer(spec.Manifest.ID, token)
+	hostSrv := r.sup.Services.NewServer(spec.Manifest.ID, token, spec.Manifest.Subscribes)
 	go hostSrv.Serve(hostLis) //nolint:errcheck // ends with Stop
 
 	fail := func(err error) (*proc, error) {

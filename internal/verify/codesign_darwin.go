@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
@@ -18,31 +19,40 @@ func newVerifier(_ *slog.Logger) supervise.Verifier {
 	return supervise.VerifierFunc(codesignVerify)
 }
 
-// codesignVerify authenticates a module binary on macOS. Two checks, both
-// against the pinned absolute /usr/bin/codesign (SecStaticCode would need
-// cgo; codesign uses the same trust store and is boring):
+// codesignVerify authenticates a module binary on macOS against the pinned
+// absolute /usr/bin/codesign (SecStaticCode would need cgo; codesign uses
+// the same trust store and is boring). The decisive check is a designated
+// requirement that the signature chains to Apple AND carries the pinned
+// Team ID:
 //
-//  1. `codesign --verify --strict=all` — the signature is valid and the
-//     binary unmodified.
-//  2. The TeamIdentifier from `codesign -dvv` equals the manifest's
-//     pinned apple_team_id. Ad-hoc signatures have no team and are
-//     refused: fetched modules must carry a real signing identity.
+//	anchor apple generic and certificate leaf[subject.OU] = "<TEAMID>"
+//
+// Without the `anchor apple generic` clause, a self-signed certificate with
+// a forged OU field satisfies plain `--verify` — TeamIdentifier alone is
+// attacker-chosen. The TeamIdentifier text check is kept as defense in
+// depth and to reject ad-hoc/no-team binaries with a clear message.
 func codesignVerify(path string, m *manifest.Manifest) error {
 	if m.Signing == nil || m.Signing.AppleTeamID == "" {
 		return fmt.Errorf("verify: manifest for %s pins no apple_team_id; refusing", m.ID)
 	}
+	if !teamIDRe.MatchString(m.Signing.AppleTeamID) {
+		return fmt.Errorf("verify: manifest for %s has malformed apple_team_id %q", m.ID, m.Signing.AppleTeamID)
+	}
 
-	verify := exec.Command("/usr/bin/codesign", "--verify", "--strict=all", path)
+	req := fmt.Sprintf(`anchor apple generic and certificate leaf[subject.OU] = %q`, m.Signing.AppleTeamID)
+	verify := exec.Command("/usr/bin/codesign", "--verify", "--strict=all", "-R", req, path)
 	var verr bytes.Buffer
 	verify.Stderr = &verr
 	if err := verify.Run(); err != nil {
-		return fmt.Errorf("verify: codesign rejected %s: %s", path, strings.TrimSpace(verr.String()))
+		return fmt.Errorf("verify: codesign rejected %s (must chain to Apple with team %s): %s",
+			path, m.Signing.AppleTeamID, strings.TrimSpace(verr.String()))
 	}
 
+	// Defense in depth: confirm the TeamIdentifier text too, and reject
+	// ad-hoc/no-team binaries explicitly.
 	display := exec.Command("/usr/bin/codesign", "-d", "-vv", path)
 	var out bytes.Buffer
-	// codesign -d writes its details to stderr.
-	display.Stderr = &out
+	display.Stderr = &out // codesign -d writes details to stderr.
 	if err := display.Run(); err != nil {
 		return fmt.Errorf("verify: codesign -d failed for %s: %w", path, err)
 	}
@@ -55,6 +65,10 @@ func codesignVerify(path string, m *manifest.Manifest) error {
 	}
 	return nil
 }
+
+// teamIDRe guards the Team ID before it is interpolated into a codesign
+// requirement string. Apple Team IDs are 10 uppercase alphanumerics.
+var teamIDRe = regexp.MustCompile(`^[A-Z0-9]{10}$`)
 
 // parseTeamIdentifier extracts TeamIdentifier=XXXX from codesign -dvv
 // output. "not set" (platform and ad-hoc binaries) is an error: there is

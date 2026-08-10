@@ -15,7 +15,14 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
 )
 
-// New returns the platform verifier for this build.
+// New returns the platform module verifier for this build.
 func New(log *slog.Logger) supervise.Verifier {
 	return newVerifier(log)
+}
+
+// Core returns the staged-core verifier weaveboot uses before promoting a
+// new core binary. Dev builds bypass; release builds fail closed until a
+// core signing identity is provisioned (see coreVerifier per build tag).
+func Core(log *slog.Logger) func(binPath string) error {
+	return coreVerifier(log)
 }

@@ -40,6 +40,11 @@ type Options struct {
 	RevertThreshold int
 	// Backoff between restarts; zero gets 2s.
 	Backoff time.Duration
+	// VerifyCore authenticates a staged core binary before it is promoted
+	// and executed as the (privileged) root of the process tree. It is the
+	// same fail-closed discipline modules get. Nil refuses all staged core
+	// promotions in release builds; dev builds may pass a permissive one.
+	VerifyCore func(binPath string) error
 }
 
 func binaryName() string {
@@ -169,6 +174,20 @@ func promoteStaged(o Options) {
 		}
 	}
 	if best == "" {
+		return
+	}
+
+	// Verify the staged core before it becomes the privileged root of the
+	// process tree — the one component that verifies everything else must
+	// not itself be promoted unverified.
+	stagedBin := filepath.Join(stagingDir, best, binaryName())
+	if o.VerifyCore == nil {
+		o.Log.Error("refusing to promote staged core: no verifier configured", "version", best)
+		return
+	}
+	if err := o.VerifyCore(stagedBin); err != nil {
+		o.Log.Error("staged core failed verification; not promoting", "version", best, "err", err)
+		os.RemoveAll(filepath.Join(stagingDir, best)) //nolint:errcheck
 		return
 	}
 

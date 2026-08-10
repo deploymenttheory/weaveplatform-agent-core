@@ -7,7 +7,9 @@ package hostserv
 import (
 	"bytes"
 	"context"
+	"crypto/subtle"
 	"log/slog"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -18,6 +20,23 @@ import (
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
 )
+
+// topicAllowed reports whether a requested subscribe pattern is covered by
+// the module's declared allow-list. A request is allowed when it exactly
+// matches an allowed entry, or when an allowed prefix glob ("a.*") covers
+// the request (including a narrower request under that prefix). A bare "*"
+// request is only allowed if the module explicitly declared "*".
+func topicAllowed(request string, allow []string) bool {
+	for _, a := range allow {
+		if a == request {
+			return true
+		}
+		if pre, ok := strings.CutSuffix(a, "*"); ok && strings.HasPrefix(request, pre) {
+			return true
+		}
+	}
+	return false
+}
 
 // StoreBackend persists module key/values. Keys arrive namespaced by
 // module id at this seam.
@@ -68,12 +87,13 @@ type Services struct {
 }
 
 // NewServer builds the per-module gRPC server: all five host services,
-// bound to the module's identity, gated by its token.
-func (s *Services) NewServer(moduleID, token string) *grpc.Server {
+// bound to the module's identity, gated by its token. subscribes is the
+// module's declared event-topic allow-list (from its manifest).
+func (s *Services) NewServer(moduleID, token string, subscribes []string) *grpc.Server {
 	srv := grpc.NewServer(tokenGate(token)...)
 	agentv1.RegisterStoreServiceServer(srv, &storeServer{s: s, module: moduleID})
 	agentv1.RegisterPolicyServiceServer(srv, &policyServer{s: s, module: moduleID})
-	agentv1.RegisterEventBusServiceServer(srv, &eventsServer{s: s, module: moduleID})
+	agentv1.RegisterEventBusServiceServer(srv, &eventsServer{s: s, module: moduleID, allow: subscribes})
 	agentv1.RegisterIdentityServiceServer(srv, &identityServer{s: s, module: moduleID})
 	agentv1.RegisterTransportServiceServer(srv, &transportServer{s: s, module: moduleID})
 	return srv
@@ -83,7 +103,7 @@ func tokenGate(token string) []grpc.ServerOption {
 	check := func(ctx context.Context) error {
 		md, _ := metadata.FromIncomingContext(ctx)
 		vals := md.Get(handshake.TokenMetadataKey)
-		if len(vals) != 1 || vals[0] != token {
+		if len(vals) != 1 || subtle.ConstantTimeCompare([]byte(vals[0]), []byte(token)) != 1 {
 			return status.Error(codes.Unauthenticated, "missing or wrong handshake token")
 		}
 		return nil
@@ -217,6 +237,7 @@ type eventsServer struct {
 	agentv1.UnimplementedEventBusServiceServer
 	s      *Services
 	module string
+	allow  []string // declared subscribe allow-list (manifest.Subscribes)
 }
 
 func (v *eventsServer) Publish(
@@ -231,6 +252,16 @@ func (v *eventsServer) Subscribe(
 	req *agentv1.SubscribeRequest,
 	stream agentv1.EventBusService_SubscribeServer,
 ) error {
+	// Authorize every requested topic against the module's declared
+	// allow-list. Without this, a module could subscribe to "*" and
+	// firehose every other module's events, undoing store isolation.
+	for _, topic := range req.GetTopics() {
+		if !topicAllowed(topic, v.allow) {
+			return status.Errorf(codes.PermissionDenied,
+				"module %q not authorized to subscribe to %q (declare it in the manifest's subscribes list)",
+				v.module, topic)
+		}
+	}
 	sub := v.s.Bus.Subscribe(req.GetTopics()...)
 	defer sub.Close()
 	for {
@@ -271,7 +302,9 @@ func (v *identityServer) Credential(
 ) (*agentv1.CredentialResponse, error) {
 	token, exp, granted, err := v.s.Identity.Credential(v.module, req.GetScopes())
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		// Fail closed and say so plainly, so a module never mistakes an
+		// unimplemented mint for a usable credential.
+		return nil, status.Error(codes.Unimplemented, err.Error())
 	}
 	return &agentv1.CredentialResponse{Token: token, ExpiresAt: exp, GrantedScopes: granted}, nil
 }

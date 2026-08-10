@@ -6,8 +6,8 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/deploymenttheory/go-bindings-win32 v0.2.1 h1:mApZJdaGj636R5lLwSPIIdA+6hKPewtdg8VpePc5VBA=
 github.com/deploymenttheory/go-bindings-win32 v0.2.1/go.mod h1:UCwSCOc2LcmtnGEQFuhyDZ9pFjMdpxvOhR4MsjOji94=
-github.com/deploymenttheory/weaveplatform-api v0.3.0 h1:JZZ7AePXPvMlcUDh/KrLWdcU/l96z+PWh7aVr/cb/QI=
-github.com/deploymenttheory/weaveplatform-api v0.3.0/go.mod h1:IUTPlHlygStaXvFEsihWddnTeFuaMVoblo1PV0udUoM=
+github.com/deploymenttheory/weaveplatform-api v0.4.0 h1:leKOqIcLWTaB/vhI3UXr9XQxdmYi/k4oXcRw33qmBMs=
+github.com/deploymenttheory/weaveplatform-api v0.4.0/go.mod h1:IUTPlHlygStaXvFEsihWddnTeFuaMVoblo1PV0udUoM=
 github.com/deploymenttheory/weaveplatform-sdk v0.2.1 h1:2sVaIzacHMzm9TFAOftl4ULfuwLJnECw1lVxzuTWTPA=
 github.com/deploymenttheory/weaveplatform-sdk v0.2.1/go.mod h1:SG9ak8IohGQIVZUSXK+lIotZmscmaP3vngtbNbdPnMQ=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=

@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -32,6 +33,13 @@ import (
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 	"github.com/deploymenttheory/weaveplatform-api/manifest"
 )
+
+// SeqStore is the subset of the store the manager needs to persist the
+// channel-manifest anti-rollback high-water mark.
+type SeqStore interface {
+	Get(namespace, key string) ([]byte, bool, error)
+	Put(namespace, key string, value []byte) error
+}
 
 // Manager performs installs and rollbacks against the supervisor.
 type Manager struct {
@@ -52,6 +60,9 @@ type Manager struct {
 	// GateStable is how long the module must stay running to pass the
 	// gate; zero gets 3s.
 	GateStable time.Duration
+	// SeqStore persists the channel-manifest anti-rollback high-water
+	// mark; nil disables the sequence check (local/dev installs).
+	SeqStore SeqStore
 
 	// installMu serializes install/rollback per module id, so two
 	// concurrent control-socket operations can't interleave Rename/current
@@ -149,6 +160,10 @@ func (m *Manager) Install(ctx context.Context, moduleID, version string) (string
 	defer os.Remove(tmp) //nolint:errcheck
 
 	mf := cm.ModuleManifest([]manifest.Platform{{OS: runtime.GOOS, Arch: runtime.GOARCH}})
+	// Validate before the manifest's id/version reach any filesystem path.
+	if err := mf.Validate(); err != nil {
+		return "", fmt.Errorf("lifecycle: channel manifest for %s: %w", moduleID, err)
+	}
 	stage, err := m.stageFiles(mf, tmp, "")
 	if err != nil {
 		return "", err
@@ -419,7 +434,45 @@ func (m *Manager) fetchChannel(ctx context.Context) (*manifest.ChannelManifest, 
 	if b.SigningKeySig, err = get("signing.pub.sig"); err != nil {
 		return nil, err
 	}
-	return manifestverify.Verify(m.RootPub, b)
+	ch, err := manifestverify.Verify(m.RootPub, b)
+	if err != nil {
+		return nil, err
+	}
+	// Freshness + anti-rollback, checked only after the signature is
+	// valid: a genuine signature gives integrity, not recency. Reject an
+	// expired (frozen) manifest and any whose sequence is below the
+	// highest we've accepted (a replayed older-but-signed document).
+	if ch.Expired(time.Now()) {
+		return nil, fmt.Errorf("lifecycle: channel manifest expired at %s", ch.Expires)
+	}
+	if m.SeqStore != nil {
+		last := m.lastSequence()
+		if ch.Sequence < last {
+			return nil, fmt.Errorf("lifecycle: channel manifest sequence %d is older than accepted %d (rollback refused)", ch.Sequence, last)
+		}
+		if ch.Sequence > last {
+			if err := m.SeqStore.Put(manifestSeqNamespace, "sequence", []byte(strconv.FormatUint(ch.Sequence, 10))); err != nil {
+				m.Log.Warn("persisting manifest sequence failed", "err", err)
+			}
+		}
+	}
+	return ch, nil
+}
+
+// manifestSeqNamespace is the core-owned store namespace for the channel
+// manifest anti-rollback high-water mark.
+const manifestSeqNamespace = "core.manifest"
+
+func (m *Manager) lastSequence() uint64 {
+	raw, found, err := m.SeqStore.Get(manifestSeqNamespace, "sequence")
+	if err != nil || !found {
+		return 0
+	}
+	n, err := strconv.ParseUint(strings.TrimSpace(string(raw)), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // download fetches url to a temp file, enforcing digest and size.

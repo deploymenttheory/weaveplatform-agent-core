@@ -36,7 +36,7 @@ func Verify(rootPub ed25519.PublicKey, b Bundle) (*manifest.ChannelManifest, err
 	if endorsement.KeyID != "root" {
 		return nil, fmt.Errorf("manifestverify: signing key endorsed by %q, not root", endorsement.KeyID)
 	}
-	if !ed25519.Verify(rootPub, b.SigningKey, endorsementSig) {
+	if !ed25519.Verify(rootPub, manifest.SigningMessage(manifest.EndorseContext, b.SigningKey), endorsementSig) {
 		return nil, fmt.Errorf("manifestverify: signing key endorsement invalid")
 	}
 
@@ -52,7 +52,7 @@ func Verify(rootPub ed25519.PublicKey, b Bundle) (*manifest.ChannelManifest, err
 	if sig.KeyID != signingKey.KeyID {
 		return nil, fmt.Errorf("manifestverify: manifest signed by %q but signing key is %q", sig.KeyID, signingKey.KeyID)
 	}
-	if !ed25519.Verify(ed25519.PublicKey(signingKeyRaw), b.Manifest, sigRaw) {
+	if !ed25519.Verify(ed25519.PublicKey(signingKeyRaw), manifest.SigningMessage(manifest.ManifestContext, b.Manifest), sigRaw) {
 		return nil, fmt.Errorf("manifestverify: manifest signature invalid")
 	}
 

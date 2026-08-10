@@ -3,6 +3,7 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -183,17 +184,31 @@ func Run(ctx context.Context, opts Options) error {
 		Verifier:    verifier,
 		Supervisor:  sup,
 		ManifestURL: opts.ManifestURL,
+		SeqStore:    st,
 	}
+	// The manifest root key is baked into release builds (embeddedRootPub)
+	// so the trust anchor can't be swapped by pointing core at a file;
+	// only dev builds honour --manifest-root-pub.
+	rootPubBytes := embeddedRootPub
 	if opts.RootPubPath != "" {
-		data, err := os.ReadFile(opts.RootPubPath)
-		if err != nil {
-			return fmt.Errorf("reading manifest root key: %w", err)
+		if !allowRootPubOverride {
+			log.Warn("ignoring --manifest-root-pub: release builds use the embedded root key")
+		} else {
+			data, err := os.ReadFile(opts.RootPubPath)
+			if err != nil {
+				return fmt.Errorf("reading manifest root key: %w", err)
+			}
+			rootPubBytes = data
 		}
-		_, raw, err := manifest.ParsePublicKey(data)
+	}
+	if len(bytes.TrimSpace(rootPubBytes)) > 0 {
+		_, raw, err := manifest.ParsePublicKey(rootPubBytes)
 		if err != nil {
 			return fmt.Errorf("manifest root key: %w", err)
 		}
 		lcm.RootPub = raw
+	} else {
+		log.Warn("no manifest root key configured; channel installs are disabled")
 	}
 
 	ctl := &controlsock.Server{
