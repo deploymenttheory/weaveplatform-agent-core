@@ -4,8 +4,8 @@ go 1.26.5
 
 require (
 	github.com/deploymenttheory/go-bindings-wmi v1.0.0
-	github.com/deploymenttheory/weaveplatform-api v0.6.0
-	github.com/deploymenttheory/weaveplatform-sdk v0.5.0
+	github.com/deploymenttheory/weaveplatform-api v0.7.0
+	github.com/deploymenttheory/weaveplatform-sdk v0.6.0
 	golang.org/x/sys v0.47.0
 )
 
