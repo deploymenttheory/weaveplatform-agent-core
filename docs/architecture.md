@@ -139,10 +139,24 @@ flowchart LR
     style ok fill:#238636,color:#fff
 ```
 
-The same shape applies one level up: **weaveboot** promotes staged core versions and reverts
-a core that crash-loops before proving stable. The installed footprint (launchd plist,
-service registration, signing identity — see [`../pkg/README.md`](../pkg/README.md)) never
-changes; only the binaries behind it do.
+The same shape applies one level up: **weaveboot** replaces core itself. An updater leaves a
+new core under `core/staging/`; weaveboot promotes it at loop start and reverts a version
+that cannot stay up. The installed footprint (launchd plist, service registration, signing
+identity — see [`../pkg/README.md`](../pkg/README.md)) never changes; only the binaries
+behind it do.
+
+```mermaid
+stateDiagram-v2
+    [*] --> promote: staged version found →<br/>becomes current, old becomes previous
+    promote --> run
+    [*] --> run: nothing staged
+    run --> stable: up ≥ 60s — crash count resets
+    stable --> run: exit → restart current
+    run --> crashed: exits early
+    crashed --> run: backoff, retry
+    crashed --> revert: 3 early exits —<br/>flip current back to previous
+    revert --> run
+```
 
 ## Core's internal layout
 

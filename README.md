@@ -17,10 +17,13 @@ running the agent, and the release pipeline.
 
 ## Repos
 
-```
-weaveplatform-api      ←  weaveplatform-sdk  ←  weaveplatform-agent          (this repo)
-                                             ←  weaveplatform-agent-modules  (the modules)
-weaveplatform-manifest    signed channel manifests, signing chain
+```mermaid
+flowchart LR
+    api[weaveplatform-api<br/>contracts] --> sdk[weaveplatform-sdk<br/>module runtime]
+    sdk --> agent[<b>weaveplatform-agent</b><br/>weaveboot · core · weavectl]
+    sdk --> modules[weaveplatform-agent-modules<br/>one module per product]
+    manifest[weaveplatform-manifest<br/>signed channel manifests] -. verified at runtime .-> agent
+    style agent fill:#1f6feb,color:#fff
 ```
 
 ## This repo
