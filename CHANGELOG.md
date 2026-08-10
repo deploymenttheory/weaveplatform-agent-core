@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.1.0...v0.1.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* pin released api/sdk versions and Windows test exe suffix ([9df40db](https://github.com/deploymenttheory/weaveplatform-agent/commit/9df40db00514056d04c236b2024f5539d27732b4))
+
 ## 0.1.0 (2026-08-10)
 
 
