@@ -106,13 +106,14 @@ stateDiagram-v2
     starting --> running: handshake + Init + Start
     running --> backoff: process exit / health strikes
     backoff --> starting: jittered exponential delay
-    backoff --> breaker: ≥5 crashes in 10 min
+    backoff --> start_limited: ≥5 crashes in 10 min
     running --> stopped: core shutdown (drain → Shutdown → kill after grace)
-    breaker --> [*]
+    start_limited --> [*]
     stopped --> [*]
 ```
 
-The breaker pins the module down rather than restarting forever; a rollback or operator
+The start limit (systemd's `StartLimitBurst`, not a Fowler circuit breaker — there is no
+half-open probe) pins the module down rather than restarting forever; a rollback or operator
 action resets it. Crash counts only reset after the module proves stable (60s up).
 
 ## Module install: stage → promote → rollback
@@ -127,7 +128,7 @@ flowchart LR
     stage["stage under staging/id/ver<br/><b>verify signature there</b>"]
     promote["promote → modules/id/versions/ver<br/>flip <code>current</code>"]
     swap["supervisor hot swap<br/>(drain old, start new)"]
-    gate{"health gate:<br/>running + stable?"}
+    gate{"health gate:<br/>sustained HEALTHY + stable?"}
     ok["retain N-1 in <code>previous</code>,<br/>prune older"]
     rb["auto-rollback:<br/>flip current back,<br/>restart old version"]
 
@@ -162,7 +163,7 @@ stateDiagram-v2
 
 | Package | Owns |
 |---|---|
-| `internal/supervise` | spawn, verify-before-exec, handshake, health, backoff, breaker, Job Objects |
+| `internal/supervise` | spawn, verify-before-exec, handshake, health, backoff, start limit, Job Objects |
 | `internal/hostserv` | per-module gRPC host services, token-gated: store, policy, events, identity, transport |
 | `internal/store` | one bbolt file, bucket per namespace, AES-256-GCM per value (namespace+key as AAD), master key sealed by `keyprotect` (DPAPI / keyfile → Secure Enclave/TPM later) |
 | `internal/policy` | fetch from GateWeave, cache in store for offline restarts, wake Watch streams on change |

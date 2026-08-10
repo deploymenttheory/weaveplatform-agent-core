@@ -69,7 +69,7 @@ go test ./...          # unit + integration; spawns real module processes
 ```
 
 Integration tests build real module binaries and drive the full handshake — supervision
-(kill → backoff → breaker), lifecycle (install → hot-swap → auto-rollback), policy
+(kill → backoff → start limit), lifecycle (install → hot-swap → auto-rollback), policy
 (stub change → module Watch stream), weaveboot (staged core → crash-loop → revert), and the
 protocol-compat fixture. Two conventions the tests rely on:
 

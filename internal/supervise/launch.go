@@ -208,16 +208,19 @@ func (r *runner) launch(ctx context.Context) (*proc, error) {
 }
 
 // stop winds a proc down: Stop with drain deadline, Shutdown, then kill
-// after grace.
+// after grace. Stop and Shutdown get separate deadlines so a slow drain
+// cannot starve the Shutdown call of its own budget.
 func (p *proc) stop(log logger) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	if _, err := p.client.Stop(ctx, &agentv1.StopRequest{DeadlineSeconds: 10}); err != nil {
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	if _, err := p.client.Stop(stopCtx, &agentv1.StopRequest{DeadlineSeconds: 10}); err != nil {
 		log.Warn("module stop failed", "err", err)
 	}
-	if _, err := p.client.Shutdown(ctx, &agentv1.ShutdownRequest{}); err != nil {
+	stopCancel()
+	shutCtx, shutCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if _, err := p.client.Shutdown(shutCtx, &agentv1.ShutdownRequest{}); err != nil {
 		log.Warn("module shutdown failed", "err", err)
 	}
+	shutCancel()
 	select {
 	case <-p.exited:
 	case <-time.After(5 * time.Second):
