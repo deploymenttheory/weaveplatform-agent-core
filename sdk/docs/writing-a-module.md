@@ -38,6 +38,35 @@ type Module interface {
 Optionally implement `ConfigReceiver` (`SetConfig(doc []byte) error`) to receive the
 core-delivered configuration document before `Init`.
 
+The runtime enforces the call order — you never defend against Init-twice or
+Start-before-Init:
+
+```mermaid
+sequenceDiagram
+    participant C as core
+    participant R as modulesdk runtime
+    participant M as your Module
+
+    Note over R: protocol negotiated, socket up,<br/>handshake line printed
+    C->>R: Init
+    R->>M: SetConfig(doc) — if implemented
+    R->>R: dial core's host services (token)
+    R->>M: Init(ctx, host)
+    Note right of M: ctx ends when Init returns —<br/>long-lived watches need their own context
+    C->>R: Start
+    R->>M: Start(ctx)
+    R->>R: scheduled Jobs begin (run once, then every interval)
+    loop until stop
+        C->>R: Health
+        R->>M: Health()
+    end
+    C->>R: Stop(deadline)
+    R->>R: cancel Jobs, wait for them
+    R->>M: Stop(ctx with deadline)
+    C->>R: Shutdown
+    Note over R: graceful gRPC stop, process exits 0
+```
+
 ## What runs where
 
 ```mermaid

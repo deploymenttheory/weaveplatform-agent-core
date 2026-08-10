@@ -4,9 +4,12 @@ The library layer of the Weave platform agent: what modules (and core) build on.
 on `weaveplatform-api` and infrastructure (grpc, x/sys). `CGO_ENABLED=0` throughout — this is
 a Zone A library.
 
-```
-weaveplatform-api  ←  weaveplatform-sdk  ←  weaveplatform-agent
-                                        ←  weaveplatform-agent-modules
+```mermaid
+flowchart LR
+    api[weaveplatform-api] --> sdk[<b>weaveplatform-sdk</b><br/>this repo]
+    sdk --> agent[weaveplatform-agent]
+    sdk --> modules[weaveplatform-agent-modules]
+    style sdk fill:#1f6feb,color:#fff
 ```
 
 ## Packages
