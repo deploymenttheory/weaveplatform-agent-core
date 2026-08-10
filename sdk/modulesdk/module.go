@@ -175,9 +175,16 @@ type UIBroker interface {
 }
 
 // Job is a recurring unit of work. Run is invoked once immediately after
-// Start, then every Every, until the module stops. Runs do not overlap.
+// Start, then on each interval, until the module stops. Runs do not
+// overlap.
+//
+// The interval is re-read every cycle: set EveryFunc for an interval that
+// can change at runtime (e.g. driven by policy), or Every for a fixed one.
+// EveryFunc takes precedence when both are set; a non-positive interval
+// ends the job.
 type Job struct {
-	Name  string
-	Every time.Duration
-	Run   func(context.Context)
+	Name      string
+	Every     time.Duration
+	EveryFunc func() time.Duration
+	Run       func(context.Context)
 }

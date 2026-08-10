@@ -76,6 +76,7 @@ func serve(m Module, log *slog.Logger) error {
 	srv := &moduleServer{
 		m:        m,
 		shutdown: make(chan struct{}, 1),
+		hostLost: make(chan struct{}, 1),
 		connectHost: func() (*hostClient, error) {
 			return dialHost(ipc.Network(), hostAddr, token, log)
 		},
@@ -90,21 +91,24 @@ func serve(m Module, log *slog.Logger) error {
 	// stdout again.
 	fmt.Println(handshake.Line{Protocol: Protocol, Network: ipc.Network(), Addr: addr}.Format())
 
-	// 5. Run until Shutdown, SIGTERM or server failure.
+	// 5. Run until Shutdown, a lost core connection, SIGTERM, or server
+	// failure.
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGTERM, os.Interrupt)
 	select {
 	case <-srv.shutdown:
 		log.Info("shutdown requested by core")
+	case <-srv.hostLost:
+		log.Warn("core connection lost; exiting to avoid orphaning")
 	case s := <-sig:
 		log.Info("signal received", "signal", s.String())
 	case err := <-errCh:
 		return fmt.Errorf("grpc server: %w", err)
 	}
 	grpcServer.GracefulStop()
-	if srv.host != nil {
-		srv.host.stopJobs()
-		srv.host.Close()
+	if host := srv.getHost(); host != nil {
+		host.stopJobs()
+		host.Close()
 	}
 	return nil
 }

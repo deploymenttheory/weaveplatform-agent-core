@@ -12,6 +12,7 @@ import (
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
 	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -67,6 +68,32 @@ func dialHost(network, addr, token string, log *slog.Logger) (*hostClient, error
 }
 
 func (h *hostClient) Close() error { return h.conn.Close() }
+
+// awaitDisconnect blocks until the connection to core's host services is
+// permanently gone, then calls onLost. It nudges the connection back to
+// Ready when it can, so only a genuine loss (core exited) — not a
+// transient blip — triggers the callback. This is the module's
+// orphan-death mechanism on platforms without Pdeathsig.
+func (h *hostClient) awaitDisconnect(onLost func()) {
+	ctx := context.Background()
+	for {
+		state := h.conn.GetState()
+		if state == connectivity.Shutdown {
+			onLost()
+			return
+		}
+		if state == connectivity.TransientFailure {
+			// The local socket peer is gone; for a unix-socket/pipe to
+			// core this does not recover — core is dead.
+			onLost()
+			return
+		}
+		h.conn.Connect()
+		if !h.conn.WaitForStateChange(ctx, state) {
+			return // ctx never cancels here; guard anyway.
+		}
+	}
+}
 
 func (h *hostClient) Log() *slog.Logger { return h.log }
 
@@ -330,14 +357,24 @@ func (h *hostClient) launchJobLocked(j Job) {
 	go func() {
 		defer h.jobWG.Done()
 		j.Run(ctx)
-		if j.Every <= 0 {
-			return
+		// Re-read the interval each cycle so a policy change takes effect,
+		// rather than capturing it once at schedule time. EveryFunc wins
+		// over the static Every when set.
+		next := func() time.Duration {
+			if j.EveryFunc != nil {
+				return j.EveryFunc()
+			}
+			return j.Every
 		}
-		t := time.NewTicker(j.Every)
-		defer t.Stop()
 		for {
+			d := next()
+			if d <= 0 {
+				return
+			}
+			t := time.NewTimer(d)
 			select {
 			case <-ctx.Done():
+				t.Stop()
 				return
 			case <-t.C:
 				j.Run(ctx)

@@ -33,11 +33,23 @@ type moduleServer struct {
 	connectHost func() (*hostClient, error)
 	// shutdown asks Serve to exit; buffered so Shutdown never blocks.
 	shutdown chan struct{}
+	// hostLost fires when the connection to core's host services drops —
+	// the unix orphan-death mechanism for platforms without Pdeathsig
+	// (macOS): if core vanishes, the module exits rather than orphaning.
+	hostLost chan struct{}
 	// healthInterval passed back to core in InitResponse.
 	healthInterval uint32
 
 	mu    sync.Mutex
 	state moduleState
+}
+
+// getHost returns the host client under the lock, so Serve's shutdown path
+// doesn't race the Init RPC that sets it.
+func (s *moduleServer) getHost() *hostClient {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.host
 }
 
 func (s *moduleServer) Init(ctx context.Context, req *agentv1.InitRequest) (*agentv1.InitResponse, error) {
@@ -73,6 +85,16 @@ func (s *moduleServer) Init(ctx context.Context, req *agentv1.InitRequest) (*age
 		return nil, status.Errorf(codes.Internal, "module init: %v", err)
 	}
 	s.state = stateInited
+
+	// Watch the host connection: if core dies, exit rather than orphan.
+	if s.hostLost != nil {
+		go host.awaitDisconnect(func() {
+			select {
+			case s.hostLost <- struct{}{}:
+			default:
+			}
+		})
+	}
 
 	requires := s.m.Requires()
 	reqCaps := make([]*agentv1.Capability, 0, len(requires))
