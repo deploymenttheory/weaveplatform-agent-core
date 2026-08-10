@@ -39,7 +39,7 @@ func TestFetchWatchAndCache(t *testing.T) {
 
 	// First fetch arrives.
 	waitFor(t, func() bool {
-		_, doc, _ := m.Get("sysinfo")
+		_, doc, _ := m.Get(context.Background(), "sysinfo")
 		return doc != nil
 	})
 
@@ -51,7 +51,7 @@ func TestFetchWatchAndCache(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("watcher never woke on policy change")
 	}
-	rev, doc, _ := m.Get("sysinfo")
+	rev, doc, _ := m.Get(context.Background(), "sysinfo")
 	if got := intervalOf(t, doc); got != 5 {
 		t.Fatalf("interval = %d, doc = %s (rev %d)", got, doc, rev)
 	}
@@ -68,7 +68,7 @@ func TestFetchWatchAndCache(t *testing.T) {
 	defer st2.Close()
 	m2 := &Manager{Log: log, Cache: st2}
 	m2.Load()
-	_, doc2, _ := m2.Get("sysinfo")
+	_, doc2, _ := m2.Get(context.Background(), "sysinfo")
 	if intervalOf(t, doc2) != 5 {
 		t.Fatalf("cache miss after restart: %s", doc2)
 	}
@@ -85,7 +85,7 @@ func TestRevisionRegressionAccepted(t *testing.T) {
 	m.apply(Document{Revision: 10, Modules: map[string]json.RawMessage{
 		"sysinfo": json.RawMessage(`{"interval_seconds":60}`),
 	}}, false)
-	if _, doc, _ := m.Get("sysinfo"); intervalOf(t, doc) != 60 {
+	if _, doc, _ := m.Get(context.Background(), "sysinfo"); intervalOf(t, doc) != 60 {
 		t.Fatalf("first apply not stored")
 	}
 
@@ -93,7 +93,7 @@ func TestRevisionRegressionAccepted(t *testing.T) {
 	m.apply(Document{Revision: 1, Modules: map[string]json.RawMessage{
 		"sysinfo": json.RawMessage(`{"interval_seconds":5}`),
 	}}, false)
-	if _, doc, _ := m.Get("sysinfo"); intervalOf(t, doc) != 5 {
+	if _, doc, _ := m.Get(context.Background(), "sysinfo"); intervalOf(t, doc) != 5 {
 		t.Fatalf("revision regression ignored: policy delivery bricked")
 	}
 
@@ -101,7 +101,7 @@ func TestRevisionRegressionAccepted(t *testing.T) {
 	m.apply(Document{Revision: 1, Modules: map[string]json.RawMessage{
 		"sysinfo": json.RawMessage(`{"interval_seconds":5}`),
 	}}, false)
-	if _, doc, _ := m.Get("sysinfo"); intervalOf(t, doc) != 5 {
+	if _, doc, _ := m.Get(context.Background(), "sysinfo"); intervalOf(t, doc) != 5 {
 		t.Fatalf("idempotent re-apply changed the doc")
 	}
 }

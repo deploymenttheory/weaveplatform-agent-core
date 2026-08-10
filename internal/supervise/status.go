@@ -18,9 +18,11 @@ const (
 	StateRunning State = "running"
 	// StateBackoff: crashed; waiting out the restart delay.
 	StateBackoff State = "backoff"
-	// StateBreaker: crash-looped past the threshold; not restarting.
-	// Fail closed: an operator (or a rollback) resets it.
-	StateBreaker State = "breaker"
+	// StateStartLimited: hit the start-limit (too many restarts in the
+	// window); not restarting. Fail closed: an operator (or a rollback)
+	// resets it. This is systemd's StartLimit, not a Fowler circuit breaker
+	// (there is no half-open probe; it gates restarts, not calls).
+	StateStartLimited State = "start-limited"
 	// StateUnsupportedProtocol: the module refused the advertised window
 	// (exit 78). Restarting cannot help; not a crash loop.
 	StateUnsupportedProtocol State = "unsupported-protocol"

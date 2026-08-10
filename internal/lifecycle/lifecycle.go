@@ -37,8 +37,8 @@ import (
 // SeqStore is the subset of the store the manager needs to persist the
 // channel-manifest anti-rollback high-water mark.
 type SeqStore interface {
-	Get(namespace, key string) ([]byte, bool, error)
-	Put(namespace, key string, value []byte) error
+	Get(ctx context.Context, namespace, key string) ([]byte, bool, error)
+	Put(ctx context.Context, namespace, key string, value []byte) error
 }
 
 // Manager performs installs and rollbacks against the supervisor.
@@ -364,7 +364,7 @@ func (m *Manager) healthGate(ctx context.Context, id string) error {
 			} else {
 				healthySince = time.Time{}
 			}
-		case supervise.StateBreaker,
+		case supervise.StateStartLimited,
 			supervise.StateUnsupportedProtocol,
 			supervise.StateRequirementsUnmet:
 			return fmt.Errorf("module state %s: %s", st.State, st.Detail)
@@ -446,12 +446,12 @@ func (m *Manager) fetchChannel(ctx context.Context) (*manifest.ChannelManifest, 
 		return nil, fmt.Errorf("lifecycle: channel manifest expired at %s", ch.Expires)
 	}
 	if m.SeqStore != nil {
-		last := m.lastSequence()
+		last := m.lastSequence(ctx)
 		if ch.Sequence < last {
 			return nil, fmt.Errorf("lifecycle: channel manifest sequence %d is older than accepted %d (rollback refused)", ch.Sequence, last)
 		}
 		if ch.Sequence > last {
-			if err := m.SeqStore.Put(manifestSeqNamespace, "sequence", []byte(strconv.FormatUint(ch.Sequence, 10))); err != nil {
+			if err := m.SeqStore.Put(ctx, manifestSeqNamespace, "sequence", []byte(strconv.FormatUint(ch.Sequence, 10))); err != nil {
 				m.Log.Warn("persisting manifest sequence failed", "err", err)
 			}
 		}
@@ -463,8 +463,8 @@ func (m *Manager) fetchChannel(ctx context.Context) (*manifest.ChannelManifest, 
 // manifest anti-rollback high-water mark.
 const manifestSeqNamespace = "core.manifest"
 
-func (m *Manager) lastSequence() uint64 {
-	raw, found, err := m.SeqStore.Get(manifestSeqNamespace, "sequence")
+func (m *Manager) lastSequence(ctx context.Context) uint64 {
+	raw, found, err := m.SeqStore.Get(ctx, manifestSeqNamespace, "sequence")
 	if err != nil || !found {
 		return 0
 	}

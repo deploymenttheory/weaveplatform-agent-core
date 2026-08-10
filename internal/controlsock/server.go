@@ -30,7 +30,7 @@ type Server struct {
 	Window     handshake.Window
 	// Identity answers WhoAmI/Enrolled for Status.
 	Identity interface {
-		WhoAmI() (string, bool, string)
+		WhoAmI(ctx context.Context) (string, bool, string)
 		Enrolled() bool
 	}
 	StartedAt time.Time
@@ -60,7 +60,7 @@ func (s *Server) Serve(ctx context.Context, addr string) error {
 
 // Status implements ControlService.
 func (s *Server) Status(ctx context.Context, _ *controlv1.StatusRequest) (*controlv1.StatusResponse, error) {
-	deviceID, _, _ := s.Identity.WhoAmI()
+	deviceID, _, _ := s.Identity.WhoAmI(ctx)
 	return &controlv1.StatusResponse{
 		CoreVersion:   version.Version,
 		Protocol:      &agentv1.ProtocolRange{Min: s.Window.Min, Max: s.Window.Max},

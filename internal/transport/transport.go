@@ -19,6 +19,7 @@ import (
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-sdk/werror"
 )
 
 // queueNamespace is the core-owned store namespace for the offline queue.
@@ -76,6 +77,7 @@ type queuedMessage struct {
 
 // Send implements hostserv.TransportBackend.
 func (m *Mux) Send(
+	ctx context.Context,
 	module string,
 	peer agentv1.Peer,
 	kind string,
@@ -84,8 +86,8 @@ func (m *Mux) Send(
 ) (bool, error) {
 	p := m.peerFor(peer)
 	if p != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		err := p.Send(ctx, module, kind, data)
+		sctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		err := p.Send(sctx, module, kind, data)
 		cancel()
 		if err == nil {
 			m.flush(p, peer)
@@ -95,9 +97,9 @@ func (m *Mux) Send(
 	}
 	if !queueOffline {
 		if p == nil {
-			return false, fmt.Errorf("peer %s not connected", peer.String())
+			return false, fmt.Errorf("peer %s not connected: %w", peer.String(), werror.ErrUnavailable)
 		}
-		return false, fmt.Errorf("peer %s unreachable", peer.String())
+		return false, fmt.Errorf("peer %s unreachable: %w", peer.String(), werror.ErrUnavailable)
 	}
 	m.enqueue(module, peer, kind, data)
 	return false, nil
@@ -132,7 +134,7 @@ func (m *Mux) seedNextIDLocked() {
 		return
 	}
 	m.seeded = true
-	keys, err := m.Queue.List(queueNamespace, "queue/")
+	keys, err := m.Queue.List(context.Background(), queueNamespace, "queue/")
 	if err != nil {
 		return
 	}
@@ -160,7 +162,7 @@ func (m *Mux) enqueue(module string, peer agentv1.Peer, kind string, data []byte
 	key := fmt.Sprintf("queue/%020d", m.nextID)
 	m.mu.Unlock()
 
-	if err := m.Queue.Put(queueNamespace, key, raw); err != nil {
+	if err := m.Queue.Put(context.Background(), queueNamespace, key, raw); err != nil {
 		m.Log.Warn("queueing message failed", "err", err)
 		return
 	}
@@ -170,7 +172,7 @@ func (m *Mux) enqueue(module string, peer agentv1.Peer, kind string, data []byte
 
 // enforceCap drops the oldest queued messages when over the count cap.
 func (m *Mux) enforceCap() {
-	keys, err := m.Queue.List(queueNamespace, "queue/")
+	keys, err := m.Queue.List(context.Background(), queueNamespace, "queue/")
 	if err != nil {
 		return
 	}
@@ -180,7 +182,7 @@ func (m *Mux) enforceCap() {
 	}
 	sort.Strings(keys) // zero-padded → lexical order is age order.
 	for _, k := range keys[:over] {
-		m.Queue.Delete(queueNamespace, k) //nolint:errcheck
+		m.Queue.Delete(context.Background(), queueNamespace, k) //nolint:errcheck
 		m.mu.Lock()
 		m.dropped++
 		m.mu.Unlock()
@@ -197,19 +199,19 @@ func (m *Mux) flush(p Peer, peer agentv1.Peer) {
 	}
 	m.flushMu.Lock()
 	defer m.flushMu.Unlock()
-	keys, err := m.Queue.List(queueNamespace, "queue/")
+	keys, err := m.Queue.List(context.Background(), queueNamespace, "queue/")
 	if err != nil || len(keys) == 0 {
 		return
 	}
 	sort.Strings(keys) // FIFO among multiple queued messages.
 	for _, key := range keys {
-		raw, found, err := m.Queue.Get(queueNamespace, key)
+		raw, found, err := m.Queue.Get(context.Background(), queueNamespace, key)
 		if err != nil || !found {
 			continue
 		}
 		var qm queuedMessage
 		if err := json.Unmarshal(raw, &qm); err != nil {
-			m.Queue.Delete(queueNamespace, key) //nolint:errcheck
+			m.Queue.Delete(context.Background(), queueNamespace, key) //nolint:errcheck
 			m.mu.Lock()
 			m.dropped++
 			m.mu.Unlock()
@@ -224,7 +226,7 @@ func (m *Mux) flush(p Peer, peer agentv1.Peer) {
 		if err != nil {
 			return // peer went away again; keep the rest queued
 		}
-		m.Queue.Delete(queueNamespace, key) //nolint:errcheck
+		m.Queue.Delete(context.Background(), queueNamespace, key) //nolint:errcheck
 	}
 }
 

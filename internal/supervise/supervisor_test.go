@@ -82,8 +82,8 @@ func newTestSupervisor(t *testing.T) *Supervisor {
 		Layout:           lay,
 		Verifier:         VerifierFunc(func(string, *manifest.Manifest) error { return nil }),
 		Backoff:          retry.Backoff{Initial: 20 * time.Millisecond, Max: 50 * time.Millisecond, Factor: 2},
-		BreakerThreshold: 3,
-		BreakerWindow:    time.Minute,
+		StartLimitBurst:  3,
+		StartLimitWindow: time.Minute,
 		HealthInterval:   100 * time.Millisecond,
 		LaunchTimeout:    15 * time.Second,
 		StableAfter:      time.Hour, // never reset crash counts inside a test
@@ -165,7 +165,7 @@ func TestBreakerTripsOnCrashLoop(t *testing.T) {
 	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err != nil {
 		t.Fatal(err)
 	}
-	st := waitState(t, sup, StateBreaker, 30*time.Second)
+	st := waitState(t, sup, StateStartLimited, 30*time.Second)
 	if st.Restarts < 3 {
 		t.Errorf("breaker tripped after %d restarts, want >= 3", st.Restarts)
 	}
@@ -206,7 +206,7 @@ func TestVerifierRefusalBlocksLaunch(t *testing.T) {
 	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err != nil {
 		t.Fatal(err)
 	}
-	st := waitState(t, sup, StateBreaker, 30*time.Second)
+	st := waitState(t, sup, StateStartLimited, 30*time.Second)
 	if st.PID != 0 {
 		t.Errorf("refused module has a PID: it was executed")
 	}

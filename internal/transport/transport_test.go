@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"context"
 	"log/slog"
 	"net/http/httptest"
 	"os"
@@ -21,21 +22,21 @@ func TestQueueSurvivesRestart(t *testing.T) {
 	// First Mux, peer down: queue two messages.
 	m1 := &Mux{Log: log, Queue: queue}
 	for _, d := range []string{"a", "b"} {
-		if _, err := m1.Send("sysinfo", agentv1.Peer_PEER_GATEWEAVE, "k", []byte(d), true); err != nil {
+		if _, err := m1.Send(context.Background(), "sysinfo", agentv1.Peer_PEER_GATEWEAVE, "k", []byte(d), true); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if keys, _ := queue.List("core.transport", "queue/"); len(keys) != 2 {
+	if keys, _ := queue.List(context.Background(), "core.transport", "queue/"); len(keys) != 2 {
 		t.Fatalf("after enqueue: %d queued, want 2", len(keys))
 	}
 
 	// "Restart": a fresh Mux over the same store queues a third message.
 	// If nextID reset to 1 it would overwrite message "a".
 	m2 := &Mux{Log: log, Queue: queue}
-	if _, err := m2.Send("sysinfo", agentv1.Peer_PEER_GATEWEAVE, "k", []byte("c"), true); err != nil {
+	if _, err := m2.Send(context.Background(), "sysinfo", agentv1.Peer_PEER_GATEWEAVE, "k", []byte("c"), true); err != nil {
 		t.Fatal(err)
 	}
-	keys, _ := queue.List("core.transport", "queue/")
+	keys, _ := queue.List(context.Background(), "core.transport", "queue/")
 	if len(keys) != 3 {
 		t.Fatalf("after restart enqueue: %d queued, want 3 (a message was overwritten)", len(keys))
 	}
@@ -50,22 +51,22 @@ func TestSendQueueAndFlush(t *testing.T) {
 	mux := &Mux{Log: log, GateWeave: peer, Queue: queue}
 
 	// Delivered while the peer is up.
-	delivered, err := mux.Send("sysinfo", agentv1.Peer_PEER_GATEWEAVE, "heartbeat", []byte("a"), true)
+	delivered, err := mux.Send(context.Background(), "sysinfo", agentv1.Peer_PEER_GATEWEAVE, "heartbeat", []byte("a"), true)
 	if err != nil || !delivered {
 		t.Fatalf("send: delivered=%v err=%v", delivered, err)
 	}
 
 	// Peer down: queueOffline queues instead of failing.
 	srv.Close()
-	delivered, err = mux.Send("sysinfo", agentv1.Peer_PEER_GATEWEAVE, "heartbeat", []byte("b"), true)
+	delivered, err = mux.Send(context.Background(), "sysinfo", agentv1.Peer_PEER_GATEWEAVE, "heartbeat", []byte("b"), true)
 	if err != nil || delivered {
 		t.Fatalf("offline send: delivered=%v err=%v", delivered, err)
 	}
 	// Without queueOffline the failure is reported.
-	if _, err := mux.Send("sysinfo", agentv1.Peer_PEER_GATEWEAVE, "heartbeat", []byte("c"), false); err == nil {
+	if _, err := mux.Send(context.Background(), "sysinfo", agentv1.Peer_PEER_GATEWEAVE, "heartbeat", []byte("c"), false); err == nil {
 		t.Fatal("offline send without queueing reported success")
 	}
-	if keys, _ := queue.List("core.transport", "queue/"); len(keys) != 1 {
+	if keys, _ := queue.List(context.Background(), "core.transport", "queue/"); len(keys) != 1 {
 		t.Fatalf("queue length = %d, want 1", len(keys))
 	}
 
@@ -74,7 +75,7 @@ func TestSendQueueAndFlush(t *testing.T) {
 	srv2 := httptest.NewServer(stub.Handler())
 	defer srv2.Close()
 	peer.URL = srv2.URL + "/v1/messages"
-	delivered, err = mux.Send("sysinfo", agentv1.Peer_PEER_GATEWEAVE, "heartbeat", []byte("d"), true)
+	delivered, err = mux.Send(context.Background(), "sysinfo", agentv1.Peer_PEER_GATEWEAVE, "heartbeat", []byte("d"), true)
 	if err != nil || !delivered {
 		t.Fatalf("recovered send: delivered=%v err=%v", delivered, err)
 	}
@@ -83,7 +84,7 @@ func TestSendQueueAndFlush(t *testing.T) {
 	if len(msgs) != 3 {
 		t.Fatalf("stub received %d messages, want 3: %+v", len(msgs), msgs)
 	}
-	if keys, _ := queue.List("core.transport", "queue/"); len(keys) != 0 {
+	if keys, _ := queue.List(context.Background(), "core.transport", "queue/"); len(keys) != 0 {
 		t.Fatalf("queue not drained: %v", keys)
 	}
 }

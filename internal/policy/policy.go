@@ -54,7 +54,7 @@ func (m *Manager) Load() {
 	if m.Cache == nil {
 		return
 	}
-	raw, found, err := m.Cache.Get(cacheNamespace, "document")
+	raw, found, err := m.Cache.Get(context.Background(), cacheNamespace, "document")
 	if err != nil || !found {
 		return
 	}
@@ -87,7 +87,9 @@ func (m *Manager) Run(ctx context.Context) {
 		}
 		wait := interval
 		if attempt > 0 {
-			wait = backoff.Delay(attempt)
+			// Back off on failure, but never poll faster than the base
+			// interval even if the backoff schedule starts shorter.
+			wait = max(interval, backoff.Delay(attempt))
 		}
 		select {
 		case <-ctx.Done():
@@ -176,7 +178,7 @@ func (m *Manager) apply(doc Document, cache bool) {
 	}
 	if cache && m.Cache != nil {
 		if raw, err := json.Marshal(doc); err == nil {
-			if err := m.Cache.Put(cacheNamespace, "document", raw); err != nil {
+			if err := m.Cache.Put(context.Background(), cacheNamespace, "document", raw); err != nil {
 				m.Log.Warn("caching policy failed", "err", err)
 			}
 		}
@@ -186,8 +188,9 @@ func (m *Manager) apply(doc Document, cache bool) {
 	}
 }
 
-// Get implements hostserv.PolicyBackend.
-func (m *Manager) Get(module string) (uint64, []byte, error) {
+// Get implements hostserv.PolicyBackend. It serves the in-memory snapshot,
+// so ctx is accepted for interface parity and cancellation but never blocks.
+func (m *Manager) Get(_ context.Context, module string) (uint64, []byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.revision, m.docs[module], nil

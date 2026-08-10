@@ -1,5 +1,6 @@
 // Package supervise owns module processes: spawn, verify-before-exec,
-// handshake, health, crash-loop damping, and the circuit breaker. It fails
+// handshake, health, crash-loop damping, and a start-limit (restart budget).
+// It fails
 // closed: a module that cannot run safely does not run.
 package supervise
 
@@ -43,10 +44,10 @@ type Supervisor struct {
 
 	// Backoff dampens restarts. Zero value gets retry.New().
 	Backoff retry.Backoff
-	// BreakerThreshold restarts within BreakerWindow trip the breaker.
+	// StartLimitBurst restarts within StartLimitWindow trip the breaker.
 	// Zero gets 5 in 10 minutes.
-	BreakerThreshold int
-	BreakerWindow    time.Duration
+	StartLimitBurst  int
+	StartLimitWindow time.Duration
 	// HealthInterval is the default poll cadence when a module doesn't
 	// request one. Zero gets 30s.
 	HealthInterval time.Duration
@@ -86,16 +87,16 @@ func (s *Supervisor) launchTimeout() time.Duration {
 	return 10 * time.Second
 }
 
-func (s *Supervisor) breakerThreshold() int {
-	if s.BreakerThreshold > 0 {
-		return s.BreakerThreshold
+func (s *Supervisor) startLimitBurst() int {
+	if s.StartLimitBurst > 0 {
+		return s.StartLimitBurst
 	}
 	return 5
 }
 
-func (s *Supervisor) breakerWindow() time.Duration {
-	if s.BreakerWindow > 0 {
-		return s.BreakerWindow
+func (s *Supervisor) startLimitWindow() time.Duration {
+	if s.StartLimitWindow > 0 {
+		return s.StartLimitWindow
 	}
 	return 10 * time.Minute
 }
@@ -339,7 +340,7 @@ func (r *runner) run(ctx context.Context) {
 		crashes = append(crashes, now)
 		pruned := crashes[:0]
 		for _, t := range crashes {
-			if now.Sub(t) <= r.sup.breakerWindow() {
+			if now.Sub(t) <= r.sup.startLimitWindow() {
 				pruned = append(pruned, t)
 			}
 		}
@@ -347,10 +348,10 @@ func (r *runner) run(ctx context.Context) {
 		r.mu.Lock()
 		r.restarts++
 		r.mu.Unlock()
-		if len(crashes) >= r.sup.breakerThreshold() {
-			r.setState(StateBreaker, "crash loop: restarts exhausted")
-			r.log.Error("circuit breaker tripped; not restarting",
-				"crashes", len(crashes), "window", r.sup.breakerWindow())
+		if len(crashes) >= r.sup.startLimitBurst() {
+			r.setState(StateStartLimited, "start limit reached: restarts exhausted")
+			r.log.Error("start limit reached; not restarting",
+				"crashes", len(crashes), "window", r.sup.startLimitWindow())
 			return
 		}
 

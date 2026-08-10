@@ -71,7 +71,7 @@ func (p *Provider) Init() error {
 	rand.Read(b[:]) //nolint:errcheck
 	p.ephemeral = "ephemeral-" + hex.EncodeToString(b[:])
 
-	raw, found, err := p.Store.Get(storeNamespace, "state")
+	raw, found, err := p.Store.Get(context.Background(), storeNamespace, "state")
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (p *Provider) saveLocked() error {
 	if err != nil {
 		return err
 	}
-	return p.Store.Put(storeNamespace, "state", raw)
+	return p.Store.Put(context.Background(), storeNamespace, "state", raw)
 }
 
 // Enroll registers the device with GateWeave if not already enrolled.
@@ -274,7 +274,7 @@ func (p *Provider) verifyAssignment(deviceID, tenant, assignmentB64, sigB64 stri
 }
 
 // WhoAmI implements hostserv.IdentityBackend.
-func (p *Provider) WhoAmI() (string, bool, string) {
+func (p *Provider) WhoAmI(_ context.Context) (string, bool, string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.deviceID != "" {
@@ -289,7 +289,7 @@ func (p *Provider) WhoAmI() (string, bool, string) {
 // forgeable token that merely looks scoped and expiring is worse than
 // none — it invites something downstream to trust it. Returning an error
 // keeps that contract honest.
-func (p *Provider) Credential(module string, scopes []string) (string, int64, []string, error) {
+func (p *Provider) Credential(_ context.Context, module string, scopes []string) (string, int64, []string, error) {
 	return "", 0, nil, fmt.Errorf("identity: scoped credentials are not yet implemented")
 }
 

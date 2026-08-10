@@ -102,8 +102,8 @@ func newTestManager(t *testing.T) (*Manager, *supervise.Supervisor, string) {
 		Layout:           lay,
 		Verifier:         supervise.VerifierFunc(func(string, *manifest.Manifest) error { return nil }),
 		Backoff:          retry.Backoff{Initial: 20 * time.Millisecond, Max: 50 * time.Millisecond, Factor: 2},
-		BreakerThreshold: 3,
-		BreakerWindow:    time.Minute,
+		StartLimitBurst:  3,
+		StartLimitWindow: time.Minute,
 		HealthInterval:   200 * time.Millisecond,
 		StableAfter:      time.Hour,
 	}

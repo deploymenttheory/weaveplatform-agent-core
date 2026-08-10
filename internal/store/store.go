@@ -6,6 +6,7 @@
 package store
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -135,7 +136,10 @@ func aad(module, key string) []byte {
 }
 
 // Get implements hostserv.StoreBackend.
-func (s *Store) Get(module, key string) ([]byte, bool, error) {
+func (s *Store) Get(ctx context.Context, module, key string) ([]byte, bool, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, false, err
+	}
 	var out []byte
 	found := false
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -159,7 +163,10 @@ func (s *Store) Get(module, key string) ([]byte, bool, error) {
 }
 
 // Put implements hostserv.StoreBackend.
-func (s *Store) Put(module, key string, value []byte) error {
+func (s *Store) Put(ctx context.Context, module, key string, value []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	sealed, err := s.seal(module, key, value)
 	if err != nil {
 		return err
@@ -174,7 +181,10 @@ func (s *Store) Put(module, key string, value []byte) error {
 }
 
 // Delete implements hostserv.StoreBackend.
-func (s *Store) Delete(module, key string) error {
+func (s *Store) Delete(ctx context.Context, module, key string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return s.db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(module))
 		if b == nil {
@@ -185,7 +195,10 @@ func (s *Store) Delete(module, key string) error {
 }
 
 // List implements hostserv.StoreBackend.
-func (s *Store) List(module, prefix string) ([]string, error) {
+func (s *Store) List(ctx context.Context, module, prefix string) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	var keys []string
 	err := s.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(module))

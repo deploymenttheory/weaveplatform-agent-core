@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,10 +24,10 @@ func TestRoundTripAndPersistence(t *testing.T) {
 	s := openTest(t, dir)
 
 	secret := []byte("the smallest secret")
-	if err := s.Put("sysinfo", "k", secret); err != nil {
+	if err := s.Put(context.Background(), "sysinfo", "k", secret); err != nil {
 		t.Fatal(err)
 	}
-	got, found, err := s.Get("sysinfo", "k")
+	got, found, err := s.Get(context.Background(), "sysinfo", "k")
 	if err != nil || !found || !bytes.Equal(got, secret) {
 		t.Fatalf("get: %q %v %v", got, found, err)
 	}
@@ -35,7 +36,7 @@ func TestRoundTripAndPersistence(t *testing.T) {
 	// Survives reopen with the same sealed key.
 	s2 := openTest(t, dir)
 	defer s2.Close()
-	got, found, _ = s2.Get("sysinfo", "k")
+	got, found, _ = s2.Get(context.Background(), "sysinfo", "k")
 	if !found || !bytes.Equal(got, secret) {
 		t.Fatal("value lost across reopen")
 	}
@@ -45,7 +46,7 @@ func TestCiphertextOnDisk(t *testing.T) {
 	dir := t.TempDir()
 	s := openTest(t, dir)
 	plaintext := []byte("EXTREMELY-RECOGNIZABLE-PLAINTEXT-SENTINEL")
-	if err := s.Put("m", "k", plaintext); err != nil {
+	if err := s.Put(context.Background(), "m", "k", plaintext); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()
@@ -62,7 +63,7 @@ func TestNamespaceIsolationInCiphertext(t *testing.T) {
 	dir := t.TempDir()
 	s := openTest(t, dir)
 	defer s.Close()
-	if err := s.Put("a", "k", []byte("v")); err != nil {
+	if err := s.Put(context.Background(), "a", "k", []byte("v")); err != nil {
 		t.Fatal(err)
 	}
 	// The AAD binds namespace+key: the same ciphertext under another
@@ -82,17 +83,17 @@ func TestNamespaceIsolationInCiphertext(t *testing.T) {
 func TestListAndDelete(t *testing.T) {
 	s := openTest(t, t.TempDir())
 	defer s.Close()
-	s.Put("m", "state/a", []byte("1")) //nolint:errcheck
-	s.Put("m", "state/b", []byte("2")) //nolint:errcheck
-	s.Put("m", "cache/c", []byte("3")) //nolint:errcheck
-	keys, err := s.List("m", "state/")
+	s.Put(context.Background(), "m", "state/a", []byte("1")) //nolint:errcheck
+	s.Put(context.Background(), "m", "state/b", []byte("2")) //nolint:errcheck
+	s.Put(context.Background(), "m", "cache/c", []byte("3")) //nolint:errcheck
+	keys, err := s.List(context.Background(), "m", "state/")
 	if err != nil || len(keys) != 2 {
 		t.Fatalf("list: %v %v", keys, err)
 	}
-	if err := s.Delete("m", "state/a"); err != nil {
+	if err := s.Delete(context.Background(), "m", "state/a"); err != nil {
 		t.Fatal(err)
 	}
-	if _, found, _ := s.Get("m", "state/a"); found {
+	if _, found, _ := s.Get(context.Background(), "m", "state/a"); found {
 		t.Fatal("deleted key still present")
 	}
 }

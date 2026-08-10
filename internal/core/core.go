@@ -135,7 +135,7 @@ func Run(ctx context.Context, opts Options) error {
 		mux.GateWeave = &transport.HTTPPeer{
 			URL: endpoint("/v1/messages"),
 			Device: func() string {
-				id, _, _ := ident.WhoAmI()
+				id, _, _ := ident.WhoAmI(context.Background())
 				return id
 			},
 		}

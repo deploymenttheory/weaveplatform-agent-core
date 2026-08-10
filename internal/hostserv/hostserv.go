@@ -1,13 +1,17 @@
 // Package hostserv serves core's host services to modules, one gRPC server
-// per module socket, every RPC gated by the module's one-time token. The
-// backends are seams: in-memory today, replaced by the encrypted store,
-// the policy pipeline and the real transport as those milestones land.
+// per module socket. Authorization is two-factor: the connection is bound to
+// the module's verified peer credential (the primary gate, set up by the
+// supervisor on the socket), and every RPC additionally carries the module's
+// handshake token, compared in constant time as a second factor. The
+// backends are seams: in-memory today, replaced by the encrypted store, the
+// policy pipeline and the real transport as those milestones land.
 package hostserv
 
 import (
 	"bytes"
 	"context"
 	"crypto/subtle"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -19,7 +23,31 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-sdk/werror"
 )
+
+// grpcErr maps a backend error to a gRPC status, translating werror
+// sentinels to their wire codes so callers see NotFound/Unavailable/etc.
+// rather than everything flattened to Internal. A nil error stays nil.
+func grpcErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	var code codes.Code
+	switch {
+	case errors.Is(err, werror.ErrNotFound):
+		code = codes.NotFound
+	case errors.Is(err, werror.ErrUnavailable):
+		code = codes.Unavailable
+	case errors.Is(err, werror.ErrDenied):
+		code = codes.PermissionDenied
+	case errors.Is(err, werror.ErrProtocol):
+		code = codes.FailedPrecondition
+	default:
+		code = codes.Internal
+	}
+	return status.Error(code, err.Error())
+}
 
 // topicAllowed reports whether a requested subscribe pattern is covered by
 // the module's declared allow-list. A request is allowed when it exactly
@@ -39,17 +67,17 @@ func topicAllowed(request string, allow []string) bool {
 }
 
 // StoreBackend persists module key/values. Keys arrive namespaced by
-// module id at this seam.
+// module id at this seam. ctx bounds the (real, on-disk) operation.
 type StoreBackend interface {
-	Get(module, key string) ([]byte, bool, error)
-	Put(module, key string, value []byte) error
-	Delete(module, key string) error
-	List(module, prefix string) ([]string, error)
+	Get(ctx context.Context, module, key string) ([]byte, bool, error)
+	Put(ctx context.Context, module, key string, value []byte) error
+	Delete(ctx context.Context, module, key string) error
+	List(ctx context.Context, module, prefix string) ([]string, error)
 }
 
 // PolicyBackend delivers module-scoped policy.
 type PolicyBackend interface {
-	Get(module string) (revision uint64, data []byte, err error)
+	Get(ctx context.Context, module string) (revision uint64, data []byte, err error)
 	// Watch returns a channel that signals on every change until ctx
 	// ends.
 	Watch(ctx context.Context, module string) <-chan struct{}
@@ -57,8 +85,9 @@ type PolicyBackend interface {
 
 // IdentityBackend answers identity questions on a module's behalf.
 type IdentityBackend interface {
-	WhoAmI() (deviceID string, ephemeral bool, tenant string)
+	WhoAmI(ctx context.Context) (deviceID string, ephemeral bool, tenant string)
 	Credential(
+		ctx context.Context,
 		module string,
 		scopes []string,
 	) (token string, expiresAt int64, granted []string, err error)
@@ -67,6 +96,7 @@ type IdentityBackend interface {
 // TransportBackend routes module messages to peers.
 type TransportBackend interface {
 	Send(
+		ctx context.Context,
 		module string,
 		peer agentv1.Peer,
 		kind string,
@@ -96,6 +126,7 @@ func (s *Services) NewServer(moduleID, token string, subscribes []string) *grpc.
 	agentv1.RegisterEventBusServiceServer(srv, &eventsServer{s: s, module: moduleID, allow: subscribes})
 	agentv1.RegisterIdentityServiceServer(srv, &identityServer{s: s, module: moduleID})
 	agentv1.RegisterTransportServiceServer(srv, &transportServer{s: s, module: moduleID})
+	agentv1.RegisterLogServiceServer(srv, &logServer{s: s, module: moduleID})
 	return srv
 }
 
@@ -140,9 +171,9 @@ func (v *storeServer) Get(
 	ctx context.Context,
 	req *agentv1.StoreGetRequest,
 ) (*agentv1.StoreGetResponse, error) {
-	val, ok, err := v.s.Store.Get(v.module, req.GetKey())
+	val, ok, err := v.s.Store.Get(ctx, v.module, req.GetKey())
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcErr(err)
 	}
 	return &agentv1.StoreGetResponse{Value: val, Found: ok}, nil
 }
@@ -151,8 +182,8 @@ func (v *storeServer) Put(
 	ctx context.Context,
 	req *agentv1.StorePutRequest,
 ) (*agentv1.StorePutResponse, error) {
-	if err := v.s.Store.Put(v.module, req.GetKey(), req.GetValue()); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	if err := v.s.Store.Put(ctx, v.module, req.GetKey(), req.GetValue()); err != nil {
+		return nil, grpcErr(err)
 	}
 	return &agentv1.StorePutResponse{}, nil
 }
@@ -161,8 +192,8 @@ func (v *storeServer) Delete(
 	ctx context.Context,
 	req *agentv1.StoreDeleteRequest,
 ) (*agentv1.StoreDeleteResponse, error) {
-	if err := v.s.Store.Delete(v.module, req.GetKey()); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	if err := v.s.Store.Delete(ctx, v.module, req.GetKey()); err != nil {
+		return nil, grpcErr(err)
 	}
 	return &agentv1.StoreDeleteResponse{}, nil
 }
@@ -171,9 +202,9 @@ func (v *storeServer) List(
 	ctx context.Context,
 	req *agentv1.StoreListRequest,
 ) (*agentv1.StoreListResponse, error) {
-	keys, err := v.s.Store.List(v.module, req.GetPrefix())
+	keys, err := v.s.Store.List(ctx, v.module, req.GetPrefix())
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcErr(err)
 	}
 	return &agentv1.StoreListResponse{Keys: keys}, nil
 }
@@ -190,9 +221,9 @@ func (v *policyServer) Get(
 	ctx context.Context,
 	_ *agentv1.PolicyGetRequest,
 ) (*agentv1.PolicyDocument, error) {
-	rev, data, err := v.s.Policy.Get(v.module)
+	rev, data, err := v.s.Policy.Get(ctx, v.module)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcErr(err)
 	}
 	return &agentv1.PolicyDocument{Revision: rev, Data: data}, nil
 }
@@ -206,9 +237,9 @@ func (v *policyServer) Watch(
 	var lastData []byte
 	first := true
 	for {
-		rev, data, err := v.s.Policy.Get(v.module)
+		rev, data, err := v.s.Policy.Get(ctx, v.module)
 		if err != nil {
-			return status.Error(codes.Internal, err.Error())
+			return grpcErr(err)
 		}
 		// Send on content change, not on revision increase — a revision
 		// reset (server restored from backup) still delivers the new
@@ -293,7 +324,7 @@ func (v *identityServer) WhoAmI(
 	ctx context.Context,
 	_ *agentv1.WhoAmIRequest,
 ) (*agentv1.DeviceIdentity, error) {
-	id, eph, tenant := v.s.Identity.WhoAmI()
+	id, eph, tenant := v.s.Identity.WhoAmI(ctx)
 	return &agentv1.DeviceIdentity{DeviceId: id, Ephemeral: eph, Tenant: tenant}, nil
 }
 
@@ -301,7 +332,7 @@ func (v *identityServer) Credential(
 	ctx context.Context,
 	req *agentv1.CredentialRequest,
 ) (*agentv1.CredentialResponse, error) {
-	token, exp, granted, err := v.s.Identity.Credential(v.module, req.GetScopes())
+	token, exp, granted, err := v.s.Identity.Credential(ctx, v.module, req.GetScopes())
 	if err != nil {
 		// Fail closed and say so plainly, so a module never mistakes an
 		// unimplemented mint for a usable credential.
@@ -324,6 +355,7 @@ func (v *transportServer) Send(
 ) (*agentv1.TransportSendResponse, error) {
 	m := req.GetMessage()
 	delivered, err := v.s.Transport.Send(
+		ctx,
 		v.module,
 		m.GetPeer(),
 		m.GetKind(),
@@ -355,4 +387,45 @@ func (v *transportServer) Receive(
 			}
 		}
 	}
+}
+
+// --- Log ---
+
+type logServer struct {
+	agentv1.UnimplementedLogServiceServer
+	s      *Services
+	module string
+}
+
+// Write receives a module's structured log records and re-emits them
+// through core's logger, attributed to the module. This is the wired
+// LogService: module logs land in core's pipeline with level/time/attrs
+// intact, rather than being scraped from stderr as opaque lines.
+func (v *logServer) Write(stream grpc.ClientStreamingServer[agentv1.LogRecord, agentv1.LogWriteResponse]) error {
+	for {
+		rec, err := stream.Recv()
+		if err != nil {
+			// io.EOF is the normal end of a client stream.
+			if err.Error() == "EOF" {
+				return stream.SendAndClose(&agentv1.LogWriteResponse{})
+			}
+			return err
+		}
+		attrs := []any{"module", v.module}
+		for k, val := range rec.GetAttrs() {
+			attrs = append(attrs, k, val)
+		}
+		v.s.Log.LogAttrs(stream.Context(), slog.Level(rec.GetLevel()), rec.GetMessage(),
+			slogArgs(attrs)...)
+	}
+}
+
+// slogArgs converts the alternating key/value slice into slog.Attr values.
+func slogArgs(kv []any) []slog.Attr {
+	out := make([]slog.Attr, 0, len(kv)/2)
+	for i := 0; i+1 < len(kv); i += 2 {
+		key, _ := kv[i].(string)
+		out = append(out, slog.Any(key, kv[i+1]))
+	}
+	return out
 }

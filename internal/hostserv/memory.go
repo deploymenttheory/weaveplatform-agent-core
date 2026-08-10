@@ -27,7 +27,7 @@ func NewMemStore() *MemStore {
 }
 
 // Get implements StoreBackend.
-func (m *MemStore) Get(module, key string) ([]byte, bool, error) {
+func (m *MemStore) Get(_ context.Context, module, key string) ([]byte, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	v, ok := m.data[module][key]
@@ -35,7 +35,7 @@ func (m *MemStore) Get(module, key string) ([]byte, bool, error) {
 }
 
 // Put implements StoreBackend.
-func (m *MemStore) Put(module, key string, value []byte) error {
+func (m *MemStore) Put(_ context.Context, module, key string, value []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.data[module] == nil {
@@ -46,7 +46,7 @@ func (m *MemStore) Put(module, key string, value []byte) error {
 }
 
 // Delete implements StoreBackend.
-func (m *MemStore) Delete(module, key string) error {
+func (m *MemStore) Delete(_ context.Context, module, key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.data[module], key)
@@ -54,7 +54,7 @@ func (m *MemStore) Delete(module, key string) error {
 }
 
 // List implements StoreBackend.
-func (m *MemStore) List(module, prefix string) ([]string, error) {
+func (m *MemStore) List(_ context.Context, module, prefix string) ([]string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	var keys []string
@@ -104,7 +104,7 @@ func (m *MemPolicy) Set(module string, data []byte) {
 }
 
 // Get implements PolicyBackend.
-func (m *MemPolicy) Get(module string) (uint64, []byte, error) {
+func (m *MemPolicy) Get(_ context.Context, module string) (uint64, []byte, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	doc := m.docs[module]
@@ -146,12 +146,12 @@ func NewStubIdentity() *StubIdentity {
 }
 
 // WhoAmI implements IdentityBackend.
-func (s *StubIdentity) WhoAmI() (string, bool, string) {
+func (s *StubIdentity) WhoAmI(_ context.Context) (string, bool, string) {
 	return s.DeviceID, true, ""
 }
 
 // Credential implements IdentityBackend.
-func (s *StubIdentity) Credential(module string, scopes []string) (string, int64, []string, error) {
+func (s *StubIdentity) Credential(_ context.Context, module string, scopes []string) (string, int64, []string, error) {
 	var b [16]byte
 	rand.Read(b[:]) //nolint:errcheck
 	return "stub-" + module + "-" + hex.EncodeToString(b[:]),
@@ -166,7 +166,7 @@ type LogTransport struct {
 }
 
 // Send implements TransportBackend.
-func (t *LogTransport) Send(module string, peer agentv1.Peer, kind string, data []byte, queueOffline bool) (bool, error) {
+func (t *LogTransport) Send(_ context.Context, module string, peer agentv1.Peer, kind string, data []byte, queueOffline bool) (bool, error) {
 	t.Log.Info("transport send (no peer connected)",
 		"module", module, "peer", peer.String(), "kind", kind, "bytes", len(data), "queue_offline", queueOffline)
 	return false, nil
