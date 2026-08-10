@@ -117,6 +117,10 @@ func Run(ctx context.Context, opts Options) error {
 		Log:       log,
 		Store:     st,
 		EnrollURL: endpoint("/v1/enroll"),
+		// Dev builds allow http + an unpinned enrolment server key; release
+		// requires https and the pinned key (S10). ServerPub wiring lands
+		// with the enrolment-key provisioning story.
+		AllowInsecureEnroll: allowRootPubOverride,
 	}
 	if err := ident.Init(); err != nil {
 		return fmt.Errorf("identity: %w", err)

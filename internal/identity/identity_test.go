@@ -22,7 +22,12 @@ func TestEnrolmentAndPersistence(t *testing.T) {
 	defer srv.Close()
 	store := hostserv.NewMemStore()
 
-	p := &Provider{Log: testLog(), Store: store, EnrollURL: srv.URL + "/v1/enroll"}
+	p := &Provider{
+		Log: testLog(), Store: store,
+		EnrollURL:           srv.URL + "/v1/enroll",
+		ServerPub:           stub.EnrollPub(),
+		AllowInsecureEnroll: true, // httptest is http, not https
+	}
 	if err := p.Init(); err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +48,12 @@ func TestEnrolmentAndPersistence(t *testing.T) {
 
 	// A fresh provider over the same store loads the identity — enrolment
 	// survives restart, and Enroll is a no-op.
-	p2 := &Provider{Log: testLog(), Store: store, EnrollURL: srv.URL + "/v1/enroll"}
+	p2 := &Provider{
+		Log: testLog(), Store: store,
+		EnrollURL:           srv.URL + "/v1/enroll",
+		ServerPub:           stub.EnrollPub(),
+		AllowInsecureEnroll: true,
+	}
 	if err := p2.Init(); err != nil {
 		t.Fatal(err)
 	}
