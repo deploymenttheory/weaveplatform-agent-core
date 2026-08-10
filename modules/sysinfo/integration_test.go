@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -15,6 +16,10 @@ import (
 // handshake and asserts it exercises every host surface.
 func TestSysinfoUnderStubCore(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "sysinfo")
+	if runtime.GOOS == "windows" {
+		// Windows cannot exec a binary without its extension.
+		bin += ".exe"
+	}
 	build := exec.Command("go", "build", "-o", bin, ".")
 	build.Env = append(build.Environ(), "CGO_ENABLED=0")
 	if out, err := build.CombinedOutput(); err != nil {
