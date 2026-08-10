@@ -2,20 +2,21 @@ package platform
 
 import (
 	"os"
-	"os/exec"
-	"strings"
+	"syscall"
 )
 
 func fill(info *Info) {
 	if hn, err := os.Hostname(); err == nil {
 		info.Hostname = hn
 	}
-	// sw_vers is stable public interface; parsing a plist adds nothing.
-	if out, err := exec.Command("/usr/bin/sw_vers", "-productVersion").Output(); err == nil {
-		info.Version = strings.TrimSpace(string(out))
+	// The go-bindings-macosplatform library deliberately wraps no sysctl;
+	// stdlib syscall.Sysctl is the established pattern (guestweave-macos
+	// internal/platform does the same).
+	if v, err := syscall.Sysctl("kern.osproductversion"); err == nil {
+		info.Version = v
 	}
-	if out, err := exec.Command("/usr/bin/sw_vers", "-buildVersion").Output(); err == nil {
-		info.Build = strings.TrimSpace(string(out))
+	if v, err := syscall.Sysctl("kern.osversion"); err == nil {
+		info.Build = v
 	}
 }
 
