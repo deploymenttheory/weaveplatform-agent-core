@@ -6,7 +6,7 @@
 // The flow (PROTOCOL.md owns the normative text):
 //
 //	core → module    env: EnvProtocolMin, EnvProtocolMax, EnvToken,
-//	                      EnvHostAddr, EnvSocketDir, EnvConfig
+//	                      EnvHostAddr, EnvSocketDir
 //	module → core    stdout: WEAVE|1|<protocol>|<network>|<addr>
 //	core → module    gRPC ModuleService.Init on <addr>
 //	module → core    gRPC dial EnvHostAddr presenting the token
@@ -31,8 +31,7 @@ const (
 	// EnvSocketDir is the core-owned directory the module's own socket
 	// must be created in (ignored for Windows named pipes).
 	EnvSocketDir = "WEAVE_SOCKET_DIR"
-	// EnvConfig is the path to the module's config document, mode 0600.
-	EnvConfig = "WEAVE_CONFIG"
+	// Config is NOT an env var: it rides InitRequest.Config on the wire.
 )
 
 // LineVersion is the handshake format version — the leading field of the
@@ -53,7 +52,7 @@ const TokenMetadataKey = "weave-handshake-token"
 type Line struct {
 	// Protocol the module speaks (already validated against the window).
 	Protocol uint32
-	// Network is "unix" or "winpipe".
+	// Network is "unix" or "npipe".
 	Network string
 	// Addr is the socket path or pipe name the module is listening on.
 	Addr string
@@ -78,7 +77,7 @@ func Parse(s string) (Line, error) {
 	if err != nil || p == 0 {
 		return Line{}, fmt.Errorf("handshake: bad protocol %q", parts[2])
 	}
-	if parts[3] != "unix" && parts[3] != "winpipe" {
+	if parts[3] != "unix" && parts[3] != "npipe" {
 		return Line{}, fmt.Errorf("handshake: unknown network %q", parts[3])
 	}
 	if parts[4] == "" {

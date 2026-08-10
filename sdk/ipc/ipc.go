@@ -20,7 +20,7 @@ import (
 // the handshake line.
 const (
 	NetworkUnix = "unix"
-	NetworkPipe = "winpipe"
+	NetworkPipe = "npipe"
 )
 
 // Listen creates a listener at addr for the platform's network:
@@ -41,7 +41,7 @@ func Dial(ctx context.Context, network, addr string) (net.Conn, error) {
 }
 
 // GRPCClient returns a gRPC client connection over the local transport.
-// target is the handshake-line address; network selects unix vs winpipe.
+// target is the handshake-line address; network selects unix vs npipe.
 func GRPCClient(network, addr string, extra ...grpc.DialOption) (*grpc.ClientConn, error) {
 	opts := append([]grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),

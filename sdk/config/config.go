@@ -14,7 +14,7 @@ import (
 // Load unmarshals the handshake-delivered JSON document into dst, which the
 // caller pre-fills with defaults. doc may be nil or empty (no config
 // delivered), which leaves dst untouched. Env overrides are the caller's
-// concern via LoadEnv where wanted.
+// concern via Env where wanted.
 func Load(doc []byte, dst any) error {
 	if len(doc) == 0 {
 		return nil

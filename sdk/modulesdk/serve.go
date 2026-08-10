@@ -3,6 +3,7 @@ package modulesdk
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -31,13 +32,24 @@ import (
 //
 // Serve does not return. A protocol outside core's advertised window exits
 // with code 78 (EX_CONFIG) before listening; other failures exit 1.
+// errProtocolUnsupported is returned by serve when the module's protocol
+// falls outside core's advertised window. Serve maps it to exit code 78
+// so that every process-exit decision lives in one place.
+var errProtocolUnsupported = fmt.Errorf("protocol out of window")
+
 func Serve(m Module) {
 	log := wlog.Default(m.ID())
-	if err := serve(m, log); err != nil {
+	err := serve(m, log)
+	switch {
+	case err == nil:
+		os.Exit(0)
+	case errors.Is(err, errProtocolUnsupported):
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(handshake.ExitProtocolUnsupported)
+	default:
 		log.Error("module runtime failed", "err", err)
 		os.Exit(1)
 	}
-	os.Exit(0)
 }
 
 func serve(m Module, log *slog.Logger) error {
@@ -50,9 +62,8 @@ func serve(m Module, log *slog.Logger) error {
 		return fmt.Errorf("reading protocol window: %w", err)
 	}
 	if !window.Contains(Protocol) {
-		fmt.Fprintf(os.Stderr, "module %s speaks protocol %d, outside advertised window [%d,%d]\n",
-			m.ID(), Protocol, window.Min, window.Max)
-		os.Exit(handshake.ExitProtocolUnsupported)
+		return fmt.Errorf("module %s speaks protocol %d, outside advertised window [%d,%d]: %w",
+			m.ID(), Protocol, window.Min, window.Max, errProtocolUnsupported)
 	}
 
 	token := os.Getenv(handshake.EnvToken)

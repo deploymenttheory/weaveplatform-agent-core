@@ -60,7 +60,9 @@ func (s *moduleServer) Init(ctx context.Context, req *agentv1.InitRequest) (*age
 	}
 	if got, want := req.GetModuleId(), s.m.ID(); got != want {
 		// Core thinks it launched a different module than this binary
-		// believes it is. Refuse: this is the tamper tell.
+		// believes it is — a launch/config mismatch (wrong binary staged
+		// under this id) or, at worst, a swapped artifact. Refuse either
+		// way: the two sides must agree on identity before Init proceeds.
 		return nil, status.Errorf(codes.FailedPrecondition, "module identity mismatch: core says %q, binary is %q", got, want)
 	}
 	if req.GetProtocol() != Protocol {

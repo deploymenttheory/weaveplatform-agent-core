@@ -28,6 +28,9 @@ type hostClient struct {
 	policy    agentv1.PolicyServiceClient
 	store     agentv1.StoreServiceClient
 	events    agentv1.EventBusServiceClient
+	logs      agentv1.LogServiceClient
+
+	streamedLog *slog.Logger
 
 	mu       sync.Mutex
 	surfaces []Surface
@@ -46,7 +49,7 @@ func dialHost(network, addr, token string, log *slog.Logger) (*hostClient, error
 	conn, err := ipc.GRPCClient(network, addr,
 		grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any,
 			cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-			return invoker(withToken(ctx), method, req, reply, cc, opts...)
+			return sentinelErr(invoker(withToken(ctx), method, req, reply, cc, opts...))
 		}),
 		grpc.WithStreamInterceptor(func(ctx context.Context, desc *grpc.StreamDesc,
 			cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
@@ -56,7 +59,7 @@ func dialHost(network, addr, token string, log *slog.Logger) (*hostClient, error
 	if err != nil {
 		return nil, fmt.Errorf("modulesdk: dialing host: %w", err)
 	}
-	return &hostClient{
+	hc := &hostClient{
 		conn:      conn,
 		log:       log,
 		identity:  agentv1.NewIdentityServiceClient(conn),
@@ -64,7 +67,12 @@ func dialHost(network, addr, token string, log *slog.Logger) (*hostClient, error
 		policy:    agentv1.NewPolicyServiceClient(conn),
 		store:     agentv1.NewStoreServiceClient(conn),
 		events:    agentv1.NewEventBusServiceClient(conn),
-	}, nil
+		logs:      agentv1.NewLogServiceClient(conn),
+	}
+	// Host.Log streams to core's LogService with the stderr logger as the
+	// pre-Init / on-failure fallback.
+	hc.streamedLog = slog.New(newStreamHandler(log.Handler(), hc.logs))
+	return hc, nil
 }
 
 func (h *hostClient) Close() error { return h.conn.Close() }
@@ -95,7 +103,12 @@ func (h *hostClient) awaitDisconnect(onLost func()) {
 	}
 }
 
-func (h *hostClient) Log() *slog.Logger { return h.log }
+func (h *hostClient) Log() *slog.Logger {
+	if h.streamedLog != nil {
+		return h.streamedLog
+	}
+	return h.log
+}
 
 // --- Identity ---
 
