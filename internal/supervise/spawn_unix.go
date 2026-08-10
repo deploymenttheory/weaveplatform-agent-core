@@ -14,16 +14,16 @@ import (
 	"github.com/deploymenttheory/weaveplatform-api/manifest"
 )
 
-// jobHandle is Windows-only containment; a no-op here. Orphans on unix die
-// with core because modules hold the host socket — a module whose core
-// vanishes loses every host service and exits on its own; the supervisor
-// also sweeps the module run dirs at startup.
+// jobHandle is Windows-only containment; a no-op here. Unix containment is
+// Pdeathsig (Linux) plus the SDK's host-connection watchdog (all unix), so
+// a module dies when core dies rather than orphaning.
 type jobHandle struct{}
 
 func baseEnv() []string { return os.Environ() }
 
-// serviceAccount is the unprivileged account modules with privilege
-// "service" run as when core itself is root. The installer creates it.
+// serviceAccount is the unprivileged account "service"-privilege modules
+// run as when core is root. Phase 2 makes this per-module; today it is one
+// shared account created by the installer.
 func serviceAccount() string {
 	if runtime.GOOS == "darwin" {
 		return "_weaveagent"
@@ -31,42 +31,88 @@ func serviceAccount() string {
 	return "weave-agent"
 }
 
-// applyPrivilege drops credentials per the manifest. Fail closed: a
-// manifest asking for a drop core cannot perform refuses the launch.
-func applyPrivilege(cmd *exec.Cmd, m *manifest.Manifest) error {
+// dropCreds resolves the uid/gid a module should drop to. ok is false when
+// core is not root (dev runs) or the module is system-privilege — in both
+// cases there is nothing to drop. It fails closed on a drop it cannot
+// perform.
+func dropCreds(m *manifest.Manifest) (uid, gid uint32, ok bool, err error) {
 	if m.Session != manifest.SessionSystem {
-		return fmt.Errorf("session placement %q not yet supported by the supervisor", m.Session)
+		return 0, 0, false, fmt.Errorf(
+			"session placement %q not yet supported by the supervisor",
+			m.Session,
+		)
 	}
 	if os.Geteuid() != 0 {
-		// Nothing to drop and nothing to drop to: dev runs, where core
-		// itself is unprivileged. The manifest's declaration is already
-		// satisfied or exceeded.
-		return nil
+		return 0, 0, false, nil
 	}
 	switch m.Privilege {
 	case manifest.PrivilegeSystem:
-		return nil
+		return 0, 0, false, nil
 	case manifest.PrivilegeService:
-		u, err := user.Lookup(serviceAccount())
-		if err != nil {
-			return fmt.Errorf("service account %q missing (installer creates it): %w", serviceAccount(), err)
+		u, lerr := user.Lookup(serviceAccount())
+		if lerr != nil {
+			return 0, 0, false, fmt.Errorf(
+				"service account %q missing (installer creates it): %w",
+				serviceAccount(),
+				lerr,
+			)
 		}
-		uid, err := strconv.ParseUint(u.Uid, 10, 32)
-		if err != nil {
-			return err
+		uid64, perr := strconv.ParseUint(u.Uid, 10, 32)
+		if perr != nil {
+			return 0, 0, false, perr
 		}
-		gid, err := strconv.ParseUint(u.Gid, 10, 32)
-		if err != nil {
-			return err
+		gid64, perr := strconv.ParseUint(u.Gid, 10, 32)
+		if perr != nil {
+			return 0, 0, false, perr
 		}
-		if cmd.SysProcAttr == nil {
-			cmd.SysProcAttr = &syscall.SysProcAttr{}
-		}
-		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}
-		return nil
+		return uint32(uid64), uint32(gid64), true, nil
 	default:
-		return fmt.Errorf("privilege %q needs per-user session support, not yet implemented", m.Privilege)
+		return 0, 0, false, fmt.Errorf(
+			"privilege %q needs per-user session support, not yet implemented",
+			m.Privilege,
+		)
 	}
+}
+
+// applyPrivilege sets the child's credentials (when dropping) and, on
+// Linux, Pdeathsig so an orphaned module is killed when core dies. The
+// returned cleanup exists to match the Windows signature (which must close
+// a token handle after Start); on unix it is a no-op.
+func applyPrivilege(cmd *exec.Cmd, m *manifest.Manifest) (cleanup func(), err error) {
+	cleanup = func() {}
+	uid, gid, ok, err := dropCreds(m)
+	if err != nil {
+		return cleanup, err
+	}
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	setPdeathsig(cmd.SysProcAttr)
+	if ok {
+		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: uid, Gid: gid}
+	}
+	return cleanup, nil
+}
+
+// prepareSocketDir makes a module's dropped uid able to create its own
+// listener in, and dial host.sock inside, the per-module socket dir. Core
+// owns the dir 0700; without this chown a dropped module EACCESes and the
+// whole privilege-drop path is dead (it was). No-op when not dropping.
+func prepareSocketDir(dir, hostAddr string, m *manifest.Manifest) error {
+	uid, gid, ok, err := dropCreds(m)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	if err := os.Chown(dir, int(uid), int(gid)); err != nil {
+		return fmt.Errorf("chown module socket dir: %w", err)
+	}
+	if err := os.Chown(hostAddr, int(uid), int(gid)); err != nil {
+		return fmt.Errorf("chown host socket: %w", err)
+	}
+	return nil
 }
 
 func postSpawn(cmd *exec.Cmd) (jobHandle, error) {

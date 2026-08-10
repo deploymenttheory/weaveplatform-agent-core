@@ -5,6 +5,7 @@ package verify
 import (
 	"fmt"
 	"log/slog"
+	"runtime"
 	"unsafe"
 
 	win32 "github.com/deploymenttheory/go-bindings-win32/bindings/runtime/win32"
@@ -41,25 +42,33 @@ func authenticodeVerify(path string, m *manifest.Manifest) error {
 		DwStateAction:       wintrust.WTD_STATEACTION_VERIFY,
 	}
 	wtd.CbStruct = uint32(unsafe.Sizeof(wtd))
+	// fileInfo is stored into a union modeled as a byte array, which the GC
+	// does not scan as a pointer slot — so nothing keeps fileInfo (and its
+	// UTF-16 path buffer) alive across the two WinVerifyTrustEx calls
+	// without an explicit KeepAlive. The CLOSE call is NOT deferred, so the
+	// KeepAlive at the end of the function covers the whole span.
 	*(*unsafe.Pointer)(unsafe.Pointer(&wtd.Anonymous.Data[0])) = unsafe.Pointer(&fileInfo)
 
 	status := wintrust.WinVerifyTrustEx(0, &wintrust.WINTRUST_ACTION_GENERIC_VERIFY_V2, &wtd)
-	defer func() {
-		wtd.DwStateAction = wintrust.WTD_STATEACTION_CLOSE
-		wintrust.WinVerifyTrustEx(0, &wintrust.WINTRUST_ACTION_GENERIC_VERIFY_V2, &wtd)
-	}()
+
+	verifyErr := error(nil)
 	if status != 0 {
-		return fmt.Errorf("verify: WinVerifyTrust rejected %s: 0x%08x", path, uint32(status))
+		verifyErr = fmt.Errorf("verify: WinVerifyTrust rejected %s: 0x%08x", path, uint32(status))
+	} else {
+		subject, serr := signerSubject(wtd.HWVTStateData)
+		switch {
+		case serr != nil:
+			verifyErr = fmt.Errorf("verify: %s: %w", path, serr)
+		case subject != m.Signing.AuthenticodeSubject:
+			verifyErr = fmt.Errorf("verify: %s signed by %q, manifest pins %q", path, subject, m.Signing.AuthenticodeSubject)
+		}
 	}
 
-	subject, err := signerSubject(wtd.HWVTStateData)
-	if err != nil {
-		return fmt.Errorf("verify: %s: %w", path, err)
-	}
-	if subject != m.Signing.AuthenticodeSubject {
-		return fmt.Errorf("verify: %s signed by %q, manifest pins %q", path, subject, m.Signing.AuthenticodeSubject)
-	}
-	return nil
+	// Release the trust state (whether verify passed or failed).
+	wtd.DwStateAction = wintrust.WTD_STATEACTION_CLOSE
+	wintrust.WinVerifyTrustEx(0, &wintrust.WINTRUST_ACTION_GENERIC_VERIFY_V2, &wtd)
+	runtime.KeepAlive(&fileInfo)
+	return verifyErr
 }
 
 // signerSubject walks the trust provider's chain to the leaf signing

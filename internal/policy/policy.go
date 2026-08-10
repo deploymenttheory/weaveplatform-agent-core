@@ -130,9 +130,18 @@ func (m *Manager) fetch(ctx context.Context) error {
 // (optionally) caches it.
 func (m *Manager) apply(doc Document, cache bool) {
 	m.mu.Lock()
-	if doc.Revision <= m.revision && m.revision != 0 {
+	// Accept any revision whose content differs, not only higher ones.
+	// A GateWeave restored from backup can reset revisions downward; the
+	// old "refuse <= current" rule bricked delivery forever (the stale
+	// revision even survived restarts via the cache). Diffing per-module
+	// content below makes a reset behave like any other change.
+	if doc.Revision == m.revision {
 		m.mu.Unlock()
 		return
+	}
+	if doc.Revision < m.revision {
+		m.Log.Warn("policy revision regressed; treating as a server reset",
+			"from", m.revision, "to", doc.Revision)
 	}
 	m.revision = doc.Revision
 	if m.docs == nil {

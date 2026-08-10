@@ -1,24 +1,26 @@
 package supervise
 
 import (
-	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"time"
+
+	"google.golang.org/grpc"
 
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 	"github.com/deploymenttheory/weaveplatform-api/manifest"
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
 	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
-	"google.golang.org/grpc"
 )
 
 // errProtocolUnsupported: the module exited 78 — clean refusal, never
@@ -34,7 +36,7 @@ type proc struct {
 	line     handshake.Line
 	initResp *agentv1.InitResponse
 	job      jobHandle
-	exited   chan error // closed after cmd.Wait returns
+	exited   chan error // buffered(1); receives cmd.Wait's result exactly once
 }
 
 // launch takes a module from binary to started: verify, host services up,
@@ -89,19 +91,26 @@ func (r *runner) launch(ctx context.Context) (*proc, error) {
 		handshake.EnvHostAddr+"="+hostAddr,
 		handshake.EnvSocketDir+"="+sockDir,
 	)
-	if err := applyPrivilege(cmd, spec.Manifest); err != nil {
+	if err := prepareSocketDir(sockDir, hostAddr, spec.Manifest); err != nil {
+		return fail(fmt.Errorf("socket dir permissions: %w", err))
+	}
+	tokenCleanup, err := applyPrivilege(cmd, spec.Manifest)
+	if err != nil {
 		return fail(fmt.Errorf("privilege setup: %w", err))
 	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return fail(err)
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return fail(err)
-	}
-	if err := cmd.Start(); err != nil {
-		return fail(fmt.Errorf("exec: %w", err))
+	// Sinks, not pipes: os/exec's own copier goroutines feed these and
+	// cmd.Wait waits for them to finish, so Wait is safe to call
+	// concurrently. Reading StdoutPipe/StderrPipe alongside Wait is the
+	// documented os/exec race (Wait closes the pipes mid-read), which lost
+	// module crash forensics and produced spurious "exited before
+	// handshake" reports.
+	firstLine := make(chan string, 1)
+	cmd.Stdout = &lineCapture{ch: firstLine, max: 1 << 16}
+	cmd.Stderr = &lineLog{log: log}
+	startErr := cmd.Start()
+	tokenCleanup() // release any privilege token now the child owns its copy
+	if startErr != nil {
+		return fail(fmt.Errorf("exec: %w", startErr))
 	}
 	job, err := postSpawn(cmd)
 	if err != nil {
@@ -109,42 +118,27 @@ func (r *runner) launch(ctx context.Context) (*proc, error) {
 		return fail(fmt.Errorf("process containment: %w", err))
 	}
 
-	// Module stderr → core's log, attributed.
-	go func() {
-		sc := bufio.NewScanner(stderr)
-		for sc.Scan() {
-			log.Info("module stderr", "line", sc.Text())
-		}
-	}()
-
 	exited := make(chan error, 1)
 	go func() { exited <- cmd.Wait() }()
 
-	// 5. The handshake line, bounded.
-	lineCh := make(chan string, 1)
-	go func() {
-		sc := bufio.NewScanner(stdout)
-		if sc.Scan() {
-			lineCh <- sc.Text()
-			io.Copy(io.Discard, stdout) //nolint:errcheck
-		}
-	}()
-
 	cleanupProc := func(err error) (*proc, error) {
 		killProc(cmd, job)
+		closeJob(job)
 		hostSrv.Stop()
 		return nil, err
 	}
 
 	var raw string
 	select {
-	case raw = <-lineCh:
+	case raw = <-firstLine:
 	case werr := <-exited:
+		closeJob(job)
 		hostSrv.Stop()
-		if cmd.ProcessState != nil && cmd.ProcessState.ExitCode() == handshake.ExitProtocolUnsupported {
+		if cmd.ProcessState != nil &&
+			cmd.ProcessState.ExitCode() == handshake.ExitProtocolUnsupported {
 			return nil, errProtocolUnsupported
 		}
-		return nil, fmt.Errorf("module exited before handshake: %v", werr)
+		return nil, fmt.Errorf("module exited before handshake: %w", werr)
 	case <-time.After(r.sup.launchTimeout()):
 		return cleanupProc(errors.New("timeout waiting for handshake line"))
 	case <-ctx.Done():
@@ -262,4 +256,64 @@ func privilegeLevel(m *manifest.Manifest) agentv1.PrivilegeLevel {
 type logger interface {
 	Info(msg string, args ...any)
 	Warn(msg string, args ...any)
+}
+
+// lineCapture is an io.Writer sink for a module's stdout that reports the
+// first line (the handshake) on ch and discards the rest. Bounded by max
+// bytes so a module that floods stdout without a newline can't grow the
+// buffer without limit — it reports an error line instead.
+type lineCapture struct {
+	ch  chan<- string
+	max int
+
+	mu   sync.Mutex
+	buf  []byte
+	done bool
+}
+
+func (w *lineCapture) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.done {
+		return len(p), nil // handshake seen; drain the rest.
+	}
+	w.buf = append(w.buf, p...)
+	if i := bytes.IndexByte(w.buf, '\n'); i >= 0 {
+		w.emit(string(w.buf[:i]))
+		return len(p), nil
+	}
+	if w.max > 0 && len(w.buf) > w.max {
+		w.emit("") // over the cap with no newline: signal a bad handshake.
+	}
+	return len(p), nil
+}
+
+func (w *lineCapture) emit(line string) {
+	w.done = true
+	w.buf = nil
+	select {
+	case w.ch <- line:
+	default:
+	}
+}
+
+// lineLog is an io.Writer sink for a module's stderr that logs each
+// complete line to core, attributed. A trailing partial line is flushed
+// when the writer is closed by os/exec's copier finishing.
+type lineLog struct {
+	log *slog.Logger
+	buf []byte
+}
+
+func (w *lineLog) Write(p []byte) (int, error) {
+	w.buf = append(w.buf, p...)
+	for {
+		i := bytes.IndexByte(w.buf, '\n')
+		if i < 0 {
+			break
+		}
+		w.log.Info("module stderr", "line", string(w.buf[:i]))
+		w.buf = w.buf[i+1:]
+	}
+	return len(p), nil
 }

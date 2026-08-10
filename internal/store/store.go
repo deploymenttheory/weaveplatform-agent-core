@@ -9,13 +9,17 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	bolt "go.etcd.io/bbolt"
+	bolterr "go.etcd.io/bbolt/errors"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/store/keyprotect"
-	bolt "go.etcd.io/bbolt"
 )
 
 // Store implements hostserv.StoreBackend with encryption at rest.
@@ -39,8 +43,18 @@ func Open(dir string, protector keyprotect.Protector) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := bolt.Open(filepath.Join(dir, "store.db"), 0o600, nil)
+	// Timeout so a second core instance (operator double-start, or
+	// weaveboot restarting before the old core released the flock) fails
+	// fast with a clear message instead of blocking forever.
+	db, err := bolt.Open(
+		filepath.Join(dir, "store.db"),
+		0o600,
+		&bolt.Options{Timeout: 2 * time.Second},
+	)
 	if err != nil {
+		if errors.Is(err, bolterr.ErrTimeout) {
+			return nil, fmt.Errorf("store: database is locked by another weave-agent instance")
+		}
 		return nil, fmt.Errorf("store: %w", err)
 	}
 	return &Store{db: db, aead: aead}, nil
@@ -70,7 +84,29 @@ func loadOrCreateKey(path string, protector keyprotect.Protector) ([]byte, error
 	if err != nil {
 		return nil, fmt.Errorf("store: sealing master key: %w", err)
 	}
-	if err := os.WriteFile(path, sealed, 0o600); err != nil {
+	// Atomic write: a crash mid-write must not leave a truncated key that
+	// renders the entire store permanently undecryptable.
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".key-*")
+	if err != nil {
+		return nil, err
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(sealed); err != nil {
+		tmp.Close()        //nolint:errcheck
+		os.Remove(tmpName) //nolint:errcheck
+		return nil, err
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()        //nolint:errcheck
+		os.Remove(tmpName) //nolint:errcheck
+		return nil, err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName) //nolint:errcheck
+		return nil, err
+	}
+	if err := os.Rename(tmpName, path); err != nil { //nolint:gosec // tmpName from os.CreateTemp; path is core-internal
+		os.Remove(tmpName) //nolint:errcheck
 		return nil, err
 	}
 	return key, nil

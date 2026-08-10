@@ -74,6 +74,38 @@ func TestFetchWatchAndCache(t *testing.T) {
 	}
 }
 
+// TestRevisionRegressionAccepted proves a GateWeave reset (revisions going
+// backwards, e.g. restored from backup) still delivers new documents,
+// rather than bricking policy delivery forever as the old
+// "refuse revision <= current" rule did.
+func TestRevisionRegressionAccepted(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	m := &Manager{Log: log}
+
+	m.apply(Document{Revision: 10, Modules: map[string]json.RawMessage{
+		"sysinfo": json.RawMessage(`{"interval_seconds":60}`),
+	}}, false)
+	if _, doc, _ := m.Get("sysinfo"); intervalOf(t, doc) != 60 {
+		t.Fatalf("first apply not stored")
+	}
+
+	// Server resets to a LOWER revision with a different document.
+	m.apply(Document{Revision: 1, Modules: map[string]json.RawMessage{
+		"sysinfo": json.RawMessage(`{"interval_seconds":5}`),
+	}}, false)
+	if _, doc, _ := m.Get("sysinfo"); intervalOf(t, doc) != 5 {
+		t.Fatalf("revision regression ignored: policy delivery bricked")
+	}
+
+	// Same revision, same content: no-op (no spurious change).
+	m.apply(Document{Revision: 1, Modules: map[string]json.RawMessage{
+		"sysinfo": json.RawMessage(`{"interval_seconds":5}`),
+	}}, false)
+	if _, doc, _ := m.Get("sysinfo"); intervalOf(t, doc) != 5 {
+		t.Fatalf("idempotent re-apply changed the doc")
+	}
+}
+
 func intervalOf(t *testing.T, doc []byte) int {
 	t.Helper()
 	var p struct {

@@ -23,11 +23,13 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/manifestverify"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
+	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 	"github.com/deploymenttheory/weaveplatform-api/manifest"
 )
 
@@ -50,6 +52,27 @@ type Manager struct {
 	// GateStable is how long the module must stay running to pass the
 	// gate; zero gets 3s.
 	GateStable time.Duration
+
+	// installMu serializes install/rollback per module id, so two
+	// concurrent control-socket operations can't interleave Rename/current
+	// writes and Supervisor.Replace calls.
+	installMu   sync.Mutex
+	perModuleMu map[string]*sync.Mutex
+}
+
+// lockModule returns the per-module install lock, creating it on first use.
+func (m *Manager) lockModule(id string) *sync.Mutex {
+	m.installMu.Lock()
+	defer m.installMu.Unlock()
+	if m.perModuleMu == nil {
+		m.perModuleMu = make(map[string]*sync.Mutex)
+	}
+	mu, ok := m.perModuleMu[id]
+	if !ok {
+		mu = &sync.Mutex{}
+		m.perModuleMu[id] = mu
+	}
+	return mu
 }
 
 func (m *Manager) client() *http.Client {
@@ -67,6 +90,9 @@ func (m *Manager) InstallLocal(ctx context.Context, dir string) (string, error) 
 	if err != nil {
 		return "", err
 	}
+	mu := m.lockModule(mf.ID)
+	mu.Lock()
+	defer mu.Unlock()
 	bin, err := findBinary(dir, mf.ID)
 	if err != nil {
 		return "", err
@@ -85,7 +111,9 @@ func (m *Manager) InstallLocal(ctx context.Context, dir string) (string, error) 
 // version empty means the channel's current.
 func (m *Manager) Install(ctx context.Context, moduleID, version string) (string, error) {
 	if m.RootPub == nil || m.ManifestURL == "" {
-		return "", fmt.Errorf("lifecycle: channel installs unavailable: no manifest source configured")
+		return "", fmt.Errorf(
+			"lifecycle: channel installs unavailable: no manifest source configured",
+		)
 	}
 	ch, err := m.fetchChannel(ctx)
 	if err != nil {
@@ -95,8 +123,17 @@ func (m *Manager) Install(ctx context.Context, moduleID, version string) (string
 	if !ok {
 		return "", fmt.Errorf("lifecycle: module %q not in channel %q", moduleID, ch.Channel)
 	}
+	mu := m.lockModule(moduleID)
+	mu.Lock()
+	defer mu.Unlock()
 	if version != "" && cm.Version != version {
-		return "", fmt.Errorf("lifecycle: channel %q carries %s@%s, not %s", ch.Channel, moduleID, cm.Version, version)
+		return "", fmt.Errorf(
+			"lifecycle: channel %q carries %s@%s, not %s",
+			ch.Channel,
+			moduleID,
+			cm.Version,
+			version,
+		)
 	}
 	art, ok := manifest.ArtifactForHost(cm.Artifacts)
 	if !ok {
@@ -124,6 +161,9 @@ func (m *Manager) Install(ctx context.Context, moduleID, version string) (string
 
 // Rollback flips a module to its retained previous version.
 func (m *Manager) Rollback(ctx context.Context, moduleID string) (string, error) {
+	mu := m.lockModule(moduleID)
+	mu.Lock()
+	defer mu.Unlock()
 	moduleDir := filepath.Join(m.Layout.ModulesDir, moduleID)
 	prev, err := os.ReadFile(filepath.Join(moduleDir, "previous"))
 	if err != nil {
@@ -142,7 +182,10 @@ func (m *Manager) Rollback(ctx context.Context, moduleID string) (string, error)
 	}
 	// The rolled-back-from version becomes "previous" so an operator can
 	// flip forward again.
-	writeFileString(filepath.Join(moduleDir, "previous"), strings.TrimSpace(string(current))) //nolint:errcheck
+	writeFileString(
+		filepath.Join(moduleDir, "previous"),
+		strings.TrimSpace(string(current)),
+	) //nolint:errcheck
 	return prevVersion, nil
 }
 
@@ -172,7 +215,11 @@ func (m *Manager) stageFiles(mf *manifest.Manifest, binPath, configPath string) 
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(filepath.Join(stage, "module.manifest.json"), mfBytes, 0o600); err != nil {
+	if err := os.WriteFile(
+		filepath.Join(stage, "module.manifest.json"),
+		mfBytes,
+		0o600,
+	); err != nil {
 		return "", err
 	}
 	// Verify before anything can exec it. Non-negotiable.
@@ -208,15 +255,28 @@ func (m *Manager) promote(ctx context.Context, mf *manifest.Manifest, stage stri
 		// Roll back to the old version if there was one.
 		if oldVersion != "" && oldVersion != mf.Version {
 			oldDir := filepath.Join(moduleDir, "versions", oldVersion)
-			if oldMf, lerr := manifest.Load(filepath.Join(oldDir, "module.manifest.json")); lerr == nil {
+			if oldMf, lerr := manifest.Load(
+				filepath.Join(oldDir, "module.manifest.json"),
+			); lerr == nil {
 				if rerr := m.activate(ctx, oldMf, oldDir); rerr != nil {
-					m.Log.Error("rollback after failed promote also failed", "module", mf.ID, "err", rerr)
+					m.Log.Error(
+						"rollback after failed promote also failed",
+						"module",
+						mf.ID,
+						"err",
+						rerr,
+					)
 				} else {
 					m.Log.Warn("promote failed; rolled back", "module", mf.ID, "to", oldVersion)
 				}
 			}
 		}
-		return fmt.Errorf("lifecycle: promote of %s@%s failed health gate: %w", mf.ID, mf.Version, err)
+		return fmt.Errorf(
+			"lifecycle: promote of %s@%s failed health gate: %w",
+			mf.ID,
+			mf.Version,
+			err,
+		)
 	}
 
 	// Success: retain exactly N-1.
@@ -228,13 +288,13 @@ func (m *Manager) promote(ctx context.Context, mf *manifest.Manifest, stage stri
 	return nil
 }
 
-// activate points current at verDir's version, swaps the runner, and
-// health-gates.
+// activate swaps the running process to verDir's version and health-gates
+// it. `current` is flipped only after the gate passes — a promote that
+// fails its gate must not leave a broken version recorded as current, and
+// (with no rollback target) the broken runner is stopped so a reboot does
+// not relaunch it. The caller bounds the gate via ctx; the runner itself
+// lives on the supervisor's run-lifetime context.
 func (m *Manager) activate(ctx context.Context, mf *manifest.Manifest, verDir string) error {
-	moduleDir := filepath.Join(m.Layout.ModulesDir, mf.ID)
-	if err := writeFileString(filepath.Join(moduleDir, "current"), mf.Version); err != nil {
-		return err
-	}
 	bin, err := findBinary(verDir, mf.ID)
 	if err != nil {
 		return err
@@ -243,8 +303,17 @@ func (m *Manager) activate(ctx context.Context, mf *manifest.Manifest, verDir st
 	if b, err := os.ReadFile(filepath.Join(verDir, "config.json")); err == nil {
 		config = b
 	}
-	m.Supervisor.Replace(ctx, supervise.Spec{Manifest: mf, BinPath: bin, Config: config})
-	return m.healthGate(ctx, mf.ID)
+	if err := m.Supervisor.Replace(
+		supervise.Spec{Manifest: mf, BinPath: bin, Config: config},
+	); err != nil {
+		return err
+	}
+	if err := m.healthGate(ctx, mf.ID); err != nil {
+		m.Supervisor.StopModule(mf.ID)
+		return err
+	}
+	moduleDir := filepath.Join(m.Layout.ModulesDir, mf.ID)
+	return writeFileString(filepath.Join(moduleDir, "current"), mf.Version)
 }
 
 // healthGate waits for the module to be running and stay running.
@@ -258,7 +327,7 @@ func (m *Manager) healthGate(ctx context.Context, id string) error {
 		stable = 3 * time.Second
 	}
 	deadline := time.Now().Add(timeout)
-	var runningSince time.Time
+	var healthySince time.Time
 	for time.Now().Before(deadline) {
 		st, ok := m.statusOf(id)
 		if !ok {
@@ -266,15 +335,26 @@ func (m *Manager) healthGate(ctx context.Context, id string) error {
 		}
 		switch st.State {
 		case supervise.StateRunning:
-			if runningSince.IsZero() {
-				runningSince = time.Now()
-			} else if time.Since(runningSince) >= stable {
-				return nil
+			// Gate on health, not mere liveness: a running-but-unhealthy
+			// module must not be promoted. The stable timer advances only
+			// while the module reports HEALTHY; DEGRADED, UNHEALTHY, or a
+			// not-yet-polled (nil) health resets it, so a module that
+			// cannot reach healthy within the window fails the gate.
+			if st.Health.GetStatus() == agentv1.Health_STATUS_HEALTHY {
+				if healthySince.IsZero() {
+					healthySince = time.Now()
+				} else if time.Since(healthySince) >= stable {
+					return nil
+				}
+			} else {
+				healthySince = time.Time{}
 			}
-		case supervise.StateBreaker, supervise.StateUnsupportedProtocol, supervise.StateRequirementsUnmet:
+		case supervise.StateBreaker,
+			supervise.StateUnsupportedProtocol,
+			supervise.StateRequirementsUnmet:
 			return fmt.Errorf("module state %s: %s", st.State, st.Detail)
 		default:
-			runningSince = time.Time{}
+			healthySince = time.Time{}
 		}
 		select {
 		case <-ctx.Done():
@@ -282,7 +362,7 @@ func (m *Manager) healthGate(ctx context.Context, id string) error {
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-	return fmt.Errorf("health gate timed out")
+	return fmt.Errorf("health gate timed out waiting for healthy")
 }
 
 func (m *Manager) statusOf(id string) (supervise.Status, bool) {
@@ -412,9 +492,32 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	return out.Close()
 }
 
+// writeFileString writes atomically: a crash mid-write must not leave a
+// truncated `current`/`previous` marker that resolves to garbage on the
+// next boot. Write to a temp file in the same directory, then rename.
 func writeFileString(path, s string) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(s+"\n"), 0o600)
+	tmp, err := os.CreateTemp(dir, ".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.WriteString(s + "\n"); err != nil {
+		tmp.Close()        //nolint:errcheck
+		os.Remove(tmpName) //nolint:errcheck
+		return err
+	}
+	if err := tmp.Chmod(0o600); err != nil {
+		tmp.Close()        //nolint:errcheck
+		os.Remove(tmpName) //nolint:errcheck
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName) //nolint:errcheck
+		return err
+	}
+	return os.Rename(tmpName, path) //nolint:gosec // tmpName from os.CreateTemp; path is core-internal
 }

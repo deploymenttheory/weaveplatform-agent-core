@@ -22,39 +22,45 @@ type jobHandle struct {
 
 func baseEnv() []string { return os.Environ() }
 
+// prepareSocketDir is a no-op on Windows (named pipes carry an SDDL, not
+// filesystem ownership; the restrictive SDDL is Phase 2 work).
+func prepareSocketDir(_, _ string, _ *manifest.Manifest) error { return nil }
+
 // applyPrivilege drops credentials per the manifest. On Windows the
 // "service" drop is a restricted primary token — same user, maximum
 // privileges removed (DISABLE_MAX_PRIVILEGE) — assigned to the child via
-// SysProcAttr.Token. Fail closed on anything core cannot honour.
-func applyPrivilege(cmd *exec.Cmd, m *manifest.Manifest) error {
+// SysProcAttr.Token. It returns a cleanup that MUST be called after
+// cmd.Start: os/exec does not take ownership of a caller-supplied token
+// handle, so without this it leaks one handle per launch — and launches
+// are a hot loop in a privileged service.
+func applyPrivilege(cmd *exec.Cmd, m *manifest.Manifest) (cleanup func(), err error) {
+	cleanup = func() {}
 	if m.Session != manifest.SessionSystem {
-		return fmt.Errorf("session placement %q not yet supported by the supervisor", m.Session)
+		return cleanup, fmt.Errorf("session placement %q not yet supported by the supervisor", m.Session)
 	}
 	switch m.Privilege {
 	case manifest.PrivilegeSystem:
-		return nil
+		return cleanup, nil
 	case manifest.PrivilegeService:
 		var procToken foundation.HANDLE
 		if err := threading.OpenProcessToken(threading.GetCurrentProcess(),
 			winsec.TOKEN_ACCESS_MASK(windows.TOKEN_DUPLICATE|windows.TOKEN_ASSIGN_PRIMARY|windows.TOKEN_QUERY),
 			&procToken); err != nil {
-			return fmt.Errorf("opening process token: %w", err)
+			return cleanup, fmt.Errorf("opening process token: %w", err)
 		}
 		defer windows.CloseHandle(windows.Handle(procToken)) //nolint:errcheck
 		var restricted foundation.HANDLE
 		if err := winsec.CreateRestrictedToken(procToken, winsec.DISABLE_MAX_PRIVILEGE,
 			nil, nil, nil, &restricted); err != nil {
-			return fmt.Errorf("creating restricted token: %w", err)
+			return cleanup, fmt.Errorf("creating restricted token: %w", err)
 		}
 		if cmd.SysProcAttr == nil {
 			cmd.SysProcAttr = &syscall.SysProcAttr{}
 		}
-		// The token handle is inherited by the child's setup; Go closes
-		// it when the process starts.
 		cmd.SysProcAttr.Token = syscall.Token(restricted)
-		return nil
+		return func() { windows.CloseHandle(windows.Handle(restricted)) }, nil //nolint:errcheck
 	default:
-		return fmt.Errorf("privilege %q needs per-user session support, not yet implemented", m.Privilege)
+		return cleanup, fmt.Errorf("privilege %q needs per-user session support, not yet implemented", m.Privilege)
 	}
 }
 

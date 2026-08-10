@@ -65,8 +65,10 @@ func exeSuffix() string {
 	return ""
 }
 
-func TestInstallHotSwapAndAutoRollback(t *testing.T) {
-	// Build the module once.
+// newTestManager builds the test module and a supervisor+manager pair
+// against a fresh short-path state dir. It returns the module binary path.
+func newTestManager(t *testing.T) (*Manager, *supervise.Supervisor, string) {
+	t.Helper()
 	bin := filepath.Join(t.TempDir(), "testmod"+exeSuffix())
 	build := exec.Command("go", "build", "-o", bin, "../supervise/testdata/testmodule")
 	build.Env = append(build.Environ(), "CGO_ENABLED=0")
@@ -105,7 +107,6 @@ func TestInstallHotSwapAndAutoRollback(t *testing.T) {
 		HealthInterval:   200 * time.Millisecond,
 		StableAfter:      time.Hour,
 	}
-
 	mgr := &Manager{
 		Log:         log,
 		Layout:      lay,
@@ -114,8 +115,46 @@ func TestInstallHotSwapAndAutoRollback(t *testing.T) {
 		GateTimeout: 20 * time.Second,
 		GateStable:  1 * time.Second,
 	}
+	return mgr, sup, bin
+}
+
+// TestInstallSurvivesRPCContextCancel is the regression test for the #1
+// bug: install/rollback threaded the per-RPC context into the runner's
+// lifetime, so the module died the instant the RPC returned. The module
+// must stay running after the install context is cancelled.
+func TestInstallSurvivesRPCContextCancel(t *testing.T) {
+	mgr, sup, bin := newTestManager(t)
+	sup.SetBaseContext(context.Background())
+
+	// The install arrives on a short-lived "RPC" context.
+	rpcCtx, rpcCancel := context.WithCancel(context.Background())
+	if _, err := mgr.InstallLocal(rpcCtx, makeInstallDir(t, bin, "1.0.0", 0)); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	rpcCancel() // the RPC returns; its context is cancelled.
+
+	// The module must still be running well after the RPC context died.
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		sts := sup.Statuses()
+		if len(sts) == 1 && sts[0].State == supervise.StateRunning {
+			time.Sleep(1 * time.Second) // and stay running
+			if s := sup.Statuses(); len(s) == 1 && s[0].State == supervise.StateRunning {
+				sup.StopModule("testmod")
+				return
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("module not running after install RPC context cancelled: %+v", sup.Statuses())
+}
+
+func TestInstallHotSwapAndAutoRollback(t *testing.T) {
+	mgr, sup, bin := newTestManager(t)
+	lay := mgr.Layout
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	sup.SetBaseContext(ctx)
 
 	// 1. Install v1: module comes up.
 	v, err := mgr.InstallLocal(ctx, makeInstallDir(t, bin, "1.0.0", 0))

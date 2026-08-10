@@ -120,8 +120,11 @@ func TestModuleRunsAndRestartsAfterKill(t *testing.T) {
 	sup := newTestSupervisor(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	sup.SetBaseContext(ctx)
 
-	sup.Add(ctx, Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin})
+	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err != nil {
+		t.Fatal(err)
+	}
 	st := waitState(t, sup, StateRunning, 15*time.Second)
 	if st.PID == 0 {
 		t.Fatal("running module has no PID")
@@ -157,8 +160,11 @@ func TestBreakerTripsOnCrashLoop(t *testing.T) {
 	t.Setenv("TESTMOD_EXIT_AFTER_MS", "50")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	sup.SetBaseContext(ctx)
 
-	sup.Add(ctx, Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin})
+	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err != nil {
+		t.Fatal(err)
+	}
 	st := waitState(t, sup, StateBreaker, 30*time.Second)
 	if st.Restarts < 3 {
 		t.Errorf("breaker tripped after %d restarts, want >= 3", st.Restarts)
@@ -172,8 +178,11 @@ func TestRequirementsUnmetNeverLaunches(t *testing.T) {
 	sup := newTestSupervisor(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	sup.SetBaseContext(ctx)
 
-	sup.Add(ctx, Spec{Manifest: testManifest("no.such.capability"), BinPath: bin})
+	if err := sup.Add(Spec{Manifest: testManifest("no.such.capability"), BinPath: bin}); err != nil {
+		t.Fatal(err)
+	}
 	st := waitState(t, sup, StateRequirementsUnmet, 5*time.Second)
 	if st.PID != 0 {
 		t.Errorf("gated module has a PID: it was launched")
@@ -192,12 +201,45 @@ func TestVerifierRefusalBlocksLaunch(t *testing.T) {
 	// never run.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	sup.SetBaseContext(ctx)
 
-	sup.Add(ctx, Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin})
+	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err != nil {
+		t.Fatal(err)
+	}
 	st := waitState(t, sup, StateBreaker, 30*time.Second)
 	if st.PID != 0 {
 		t.Errorf("refused module has a PID: it was executed")
 	}
 	cancel()
 	sup.Wait()
+}
+
+func TestAddRefusesDuplicateID(t *testing.T) {
+	bin := buildTestModule(t)
+	sup := newTestSupervisor(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sup.SetBaseContext(ctx)
+
+	spec := Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}
+	if err := sup.Add(spec); err != nil {
+		t.Fatal(err)
+	}
+	// A second Add for the same id must be refused rather than silently
+	// overwriting the runner and orphaning the live process.
+	if err := sup.Add(spec); err == nil {
+		t.Fatal("duplicate Add accepted; the first runner would be orphaned")
+	}
+	cancel()
+	sup.Wait()
+}
+
+func TestAddRequiresBaseContext(t *testing.T) {
+	bin := buildTestModule(t)
+	sup := newTestSupervisor(t)
+	// No SetBaseContext: Add must refuse rather than derive a runner from
+	// a nil (or per-call) context.
+	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err == nil {
+		t.Fatal("Add accepted without a base context")
+	}
 }

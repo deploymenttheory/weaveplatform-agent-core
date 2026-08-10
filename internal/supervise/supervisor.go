@@ -5,9 +5,12 @@ package supervise
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,8 +59,24 @@ type Supervisor struct {
 	// count resets. Zero gets 60s.
 	StableAfter time.Duration
 
+	// baseCtx is the run-lifetime context every runner derives from. It
+	// is deliberately NOT the caller's context on Add/Replace: an install
+	// or rollback arrives on a per-RPC context that is cancelled the
+	// moment the RPC returns, and a module's lifetime must outlive the
+	// call that installed it. Set once via SetBaseContext before Add.
+	baseCtx context.Context
+
 	mu      sync.Mutex
 	runners map[string]*runner
+}
+
+// SetBaseContext records the run-lifetime context. Call once, from
+// core startup, before any Add. Modules live and die with this context,
+// not with the context of whatever operation spawned them.
+func (s *Supervisor) SetBaseContext(ctx context.Context) {
+	s.mu.Lock()
+	s.baseCtx = ctx
+	s.mu.Unlock()
 }
 
 func (s *Supervisor) launchTimeout() time.Duration {
@@ -117,11 +136,25 @@ func (s *Supervisor) capabilityList() []*agentv1.Capability {
 	return out
 }
 
-// Add registers a module. Pre-launch gates run here: platform support and
-// the capability probe. Gated modules are registered (visible to
-// operators) but never launched.
-func (s *Supervisor) Add(ctx context.Context, spec Spec) {
-	runCtx, cancel := context.WithCancel(ctx)
+// Add registers and launches a module on the run-lifetime context. Pre-launch
+// gates run here: platform support and the capability probe. Gated modules are
+// registered (visible to operators) but never launched. Adding an id that is
+// already registered is refused — callers hot-swap via Replace, which stops the
+// incumbent first.
+func (s *Supervisor) Add(spec Spec) error {
+	s.mu.Lock()
+	if s.baseCtx == nil {
+		s.mu.Unlock()
+		return fmt.Errorf("supervise: SetBaseContext not called before Add")
+	}
+	if s.runners == nil {
+		s.runners = make(map[string]*runner)
+	}
+	if _, exists := s.runners[spec.Manifest.ID]; exists {
+		s.mu.Unlock()
+		return fmt.Errorf("supervise: module %q already registered", spec.Manifest.ID)
+	}
+	runCtx, cancel := context.WithCancel(s.baseCtx)
 	r := &runner{
 		sup:    s,
 		spec:   spec,
@@ -130,17 +163,14 @@ func (s *Supervisor) Add(ctx context.Context, spec Spec) {
 		since:  time.Now(),
 		cancel: cancel,
 	}
-	s.mu.Lock()
-	if s.runners == nil {
-		s.runners = make(map[string]*runner)
-	}
 	s.runners[spec.Manifest.ID] = r
 	s.mu.Unlock()
 
 	if missing := s.Caps.Has(spec.Manifest.Capabilities...); len(missing) > 0 {
-		r.setState(StateRequirementsUnmet, "missing capabilities: "+joinStrings(missing))
+		r.setState(StateRequirementsUnmet, "missing capabilities: "+strings.Join(missing, ", "))
 		r.log.Warn("module not launched: requirements unmet", "missing", missing)
-		return
+		cancel() // gated module never runs; don't leak the context.
+		return nil
 	}
 
 	r.wg.Add(1)
@@ -148,6 +178,7 @@ func (s *Supervisor) Add(ctx context.Context, spec Spec) {
 		defer r.wg.Done()
 		r.run(runCtx)
 	}()
+	return nil
 }
 
 // StopModule winds one module down (drain, shutdown, kill after grace)
@@ -165,11 +196,11 @@ func (s *Supervisor) StopModule(id string) {
 }
 
 // Replace hot-swaps a module: the old process drains and stops, then the
-// new spec starts. The caller health-gates the result and rolls back on
-// failure.
-func (s *Supervisor) Replace(ctx context.Context, spec Spec) {
+// new spec starts on the run-lifetime context. The caller health-gates the
+// result and rolls back on failure.
+func (s *Supervisor) Replace(spec Spec) error {
 	s.StopModule(spec.Manifest.ID)
-	s.Add(ctx, spec)
+	return s.Add(spec)
 }
 
 // SweepOrphans clears leftover per-module socket dirs from a previous core
@@ -273,7 +304,7 @@ func (r *runner) run(ctx context.Context) {
 		p, err := r.launch(ctx)
 		if err != nil {
 			switch {
-			case err == errProtocolUnsupported:
+			case errors.Is(err, errProtocolUnsupported):
 				r.setState(StateUnsupportedProtocol, "")
 				r.log.Error("module refused protocol window; not restarting")
 				return
@@ -346,7 +377,14 @@ func (r *runner) monitor(ctx context.Context, p *proc) bool {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	// Poll once immediately so r.health is populated within the launch
+	// rather than after a full interval — the promote health gate depends
+	// on seeing a status promptly, and the default interval is 30s.
 	strikes := 0
+	if r.pollHealth(ctx, p, &strikes) {
+		p.kill()
+		return false
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -358,30 +396,7 @@ func (r *runner) monitor(ctx context.Context, p *proc) bool {
 			r.log.Warn("module exited", "err", err)
 			return false
 		case <-ticker.C:
-			hctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-			resp, err := p.client.Health(hctx, &agentv1.HealthRequest{})
-			cancel()
-			if err != nil {
-				strikes++
-				r.log.Warn("health poll failed", "err", err, "strikes", strikes)
-			} else {
-				h := resp.GetHealth()
-				r.mu.Lock()
-				r.health = h
-				r.mu.Unlock()
-				switch h.GetStatus() {
-				case agentv1.Health_STATUS_UNHEALTHY:
-					strikes++
-					r.log.Warn("module unhealthy", "reason", h.GetReason(), "strikes", strikes)
-				case agentv1.Health_STATUS_DEGRADED:
-					strikes = 0
-					r.log.Info("module degraded", "reason", h.GetReason())
-				default:
-					strikes = 0
-				}
-			}
-			if strikes >= r.sup.healthStrikes() {
-				r.log.Error("health strikes exhausted; restarting module")
+			if r.pollHealth(ctx, p, &strikes) {
 				p.kill()
 				return false
 			}
@@ -389,13 +404,30 @@ func (r *runner) monitor(ctx context.Context, p *proc) bool {
 	}
 }
 
-func joinStrings(ss []string) string {
-	out := ""
-	for i, s := range ss {
-		if i > 0 {
-			out += ", "
+// pollHealth performs one health check, records the status, and returns
+// true when accumulated strikes mean the module should be restarted.
+func (r *runner) pollHealth(ctx context.Context, p *proc, strikes *int) (restart bool) {
+	hctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	resp, err := p.client.Health(hctx, &agentv1.HealthRequest{})
+	cancel()
+	if err != nil {
+		*strikes++
+		r.log.Warn("health poll failed", "err", err, "strikes", *strikes)
+	} else {
+		h := resp.GetHealth()
+		r.mu.Lock()
+		r.health = h
+		r.mu.Unlock()
+		switch h.GetStatus() {
+		case agentv1.Health_STATUS_UNHEALTHY:
+			*strikes++
+			r.log.Warn("module unhealthy", "reason", h.GetReason(), "strikes", *strikes)
+		case agentv1.Health_STATUS_DEGRADED:
+			*strikes = 0
+			r.log.Info("module degraded", "reason", h.GetReason())
+		default:
+			*strikes = 0
 		}
-		out += s
 	}
-	return out
+	return *strikes >= r.sup.healthStrikes()
 }

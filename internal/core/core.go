@@ -153,6 +153,10 @@ func Run(ctx context.Context, opts Options) error {
 		Layout:   lay,
 		Verifier: verifier,
 	}
+	// Modules live on the core run-lifetime context, never on the context
+	// of whatever operation (boot loop, control-socket install) spawned
+	// them.
+	sup.SetBaseContext(ctx)
 	sup.SweepOrphans()
 
 	specs, err := discoverModules(modulesDir)
@@ -168,7 +172,9 @@ func Run(ctx context.Context, opts Options) error {
 				"module", spec.Manifest.ID, "os", runtime.GOOS, "arch", runtime.GOARCH)
 			continue
 		}
-		sup.Add(ctx, spec)
+		if err := sup.Add(spec); err != nil {
+			log.Error("registering module failed", "module", spec.Manifest.ID, "err", err)
+		}
 	}
 
 	lcm := &lifecycle.Manager{
@@ -252,7 +258,11 @@ func discoverModules(dir string) ([]supervise.Spec, error) {
 			}
 		}
 		if bin == "" {
-			return nil, fmt.Errorf("module %s: manifest present but no binary found in %s", m.ID, mdir)
+			return nil, fmt.Errorf(
+				"module %s: manifest present but no binary found in %s",
+				m.ID,
+				mdir,
+			)
 		}
 		var config []byte
 		if b, err := os.ReadFile(filepath.Join(mdir, "config.json")); err == nil {

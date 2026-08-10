@@ -11,6 +11,36 @@ import (
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 )
 
+// TestQueueSurvivesRestart proves the offline queue counter is recovered
+// from the store on a new Mux, so a restart does not reset nextID to 1 and
+// overwrite still-queued messages.
+func TestQueueSurvivesRestart(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	queue := hostserv.NewMemStore()
+
+	// First Mux, peer down: queue two messages.
+	m1 := &Mux{Log: log, Queue: queue}
+	for _, d := range []string{"a", "b"} {
+		if _, err := m1.Send("sysinfo", agentv1.Peer_PEER_GATEWEAVE, "k", []byte(d), true); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if keys, _ := queue.List("core.transport", "queue/"); len(keys) != 2 {
+		t.Fatalf("after enqueue: %d queued, want 2", len(keys))
+	}
+
+	// "Restart": a fresh Mux over the same store queues a third message.
+	// If nextID reset to 1 it would overwrite message "a".
+	m2 := &Mux{Log: log, Queue: queue}
+	if _, err := m2.Send("sysinfo", agentv1.Peer_PEER_GATEWEAVE, "k", []byte("c"), true); err != nil {
+		t.Fatal(err)
+	}
+	keys, _ := queue.List("core.transport", "queue/")
+	if len(keys) != 3 {
+		t.Fatalf("after restart enqueue: %d queued, want 3 (a message was overwritten)", len(keys))
+	}
+}
+
 func TestSendQueueAndFlush(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 	stub := stubgateweave.New()
