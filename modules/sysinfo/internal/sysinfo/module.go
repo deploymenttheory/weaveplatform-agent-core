@@ -81,11 +81,14 @@ func (m *Module) Init(ctx context.Context, host modulesdk.Host) error {
 		return err
 	}
 
-	// The scheduled collection: runs once at Start, then every interval.
+	// The scheduled collection: runs once at Start, then on each interval.
+	// EveryFunc re-reads the interval each cycle so a policy change to
+	// sysinfo/interval actually changes the collection cadence, not just
+	// the reported value.
 	host.Schedule(modulesdk.Job{
-		Name:  "collect",
-		Every: m.currentInterval(),
-		Run:   m.collectAndReport,
+		Name:      "collect",
+		EveryFunc: m.currentInterval,
+		Run:       m.collectAndReport,
 	})
 	return nil
 }
