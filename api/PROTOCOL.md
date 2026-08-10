@@ -68,9 +68,10 @@ is pinned and rolled.
 ## Additive change, worked example
 
 The policy envelope (`schema_version`, `content_type` on `PolicyDocument`), event sequence
-numbers (`sequence` on `Event`), and the standard `grpc.health.v1` service were all added
-under protocol **1**: new optional fields and a new service are wire-compatible, so by the
-rules above they do not bump the integer. A protocol-2 package is minted only when a genuinely
+numbers (`sequence` on `Event`), the standard `grpc.health.v1` service, and the push
+`WatchdogService` (plus `watchdog_interval_seconds` on `InitRequest`) were all added under
+protocol **1**: new optional fields and new services are wire-compatible, so by the rules
+above they do not bump the integer. A protocol-2 package is minted only when a genuinely
 breaking change lands, at which point `test/protocompat/v2` is added beside `v1`.
 
 ## The handshake

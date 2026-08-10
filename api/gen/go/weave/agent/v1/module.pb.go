@@ -38,9 +38,13 @@ type InitRequest struct {
 	// Opaque module configuration. Core does not know what is in it.
 	Config []byte `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
 	// The privilege level actually granted at spawn.
-	Privilege     PrivilegeLevel `protobuf:"varint,5,opt,name=privilege,proto3,enum=weave.agent.v1.PrivilegeLevel" json:"privilege,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Privilege PrivilegeLevel `protobuf:"varint,5,opt,name=privilege,proto3,enum=weave.agent.v1.PrivilegeLevel" json:"privilege,omitempty"`
+	// How often core wants the module to send a WatchdogService ping, in
+	// seconds. Zero disables the watchdog (core falls back to Health polling
+	// alone). Additive; a module built before this field simply never pings.
+	WatchdogIntervalSeconds uint32 `protobuf:"varint,6,opt,name=watchdog_interval_seconds,json=watchdogIntervalSeconds,proto3" json:"watchdog_interval_seconds,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *InitRequest) Reset() {
@@ -106,6 +110,13 @@ func (x *InitRequest) GetPrivilege() PrivilegeLevel {
 		return x.Privilege
 	}
 	return PrivilegeLevel_PRIVILEGE_LEVEL_UNSPECIFIED
+}
+
+func (x *InitRequest) GetWatchdogIntervalSeconds() uint32 {
+	if x != nil {
+		return x.WatchdogIntervalSeconds
+	}
+	return 0
 }
 
 type InitResponse struct {
@@ -482,13 +493,14 @@ var File_weave_agent_v1_module_proto protoreflect.FileDescriptor
 
 const file_weave_agent_v1_module_proto_rawDesc = "" +
 	"\n" +
-	"\x1bweave/agent/v1/module.proto\x12\x0eweave.agent.v1\x1a\x1eweave/agent/v1/handshake.proto\x1a\x1bweave/agent/v1/health.proto\x1a\x17weave/agent/v1/ui.proto\"\xdc\x01\n" +
+	"\x1bweave/agent/v1/module.proto\x12\x0eweave.agent.v1\x1a\x1eweave/agent/v1/handshake.proto\x1a\x1bweave/agent/v1/health.proto\x1a\x17weave/agent/v1/ui.proto\"\x98\x02\n" +
 	"\vInitRequest\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\rR\bprotocol\x12\x1b\n" +
 	"\tmodule_id\x18\x02 \x01(\tR\bmoduleId\x12>\n" +
 	"\fcapabilities\x18\x03 \x03(\v2\x1a.weave.agent.v1.CapabilityR\fcapabilities\x12\x16\n" +
 	"\x06config\x18\x04 \x01(\fR\x06config\x12<\n" +
-	"\tprivilege\x18\x05 \x01(\x0e2\x1e.weave.agent.v1.PrivilegeLevelR\tprivilege\"\xb3\x01\n" +
+	"\tprivilege\x18\x05 \x01(\x0e2\x1e.weave.agent.v1.PrivilegeLevelR\tprivilege\x12:\n" +
+	"\x19watchdog_interval_seconds\x18\x06 \x01(\rR\x17watchdogIntervalSeconds\"\xb3\x01\n" +
 	"\fInitResponse\x126\n" +
 	"\brequires\x18\x01 \x03(\v2\x1a.weave.agent.v1.CapabilityR\brequires\x123\n" +
 	"\bsurfaces\x18\x02 \x03(\v2\x17.weave.agent.v1.SurfaceR\bsurfaces\x126\n" +

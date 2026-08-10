@@ -31,6 +31,10 @@ message InitRequest {
   bytes config = 4;
   // The privilege level actually granted at spawn.
   PrivilegeLevel privilege = 5;
+  // How often core wants the module to send a WatchdogService ping, in
+  // seconds. Zero disables the watchdog (core falls back to Health polling
+  // alone). Additive; a module built before this field simply never pings.
+  uint32 watchdog_interval_seconds = 6;
 }
 
 message InitResponse {
