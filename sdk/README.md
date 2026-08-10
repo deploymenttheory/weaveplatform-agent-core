@@ -21,6 +21,13 @@ weaveplatform-api  ←  weaveplatform-sdk  ←  weaveplatform-agent
 | `config` | Handshake-delivered config document > env > defaults; no files, no viper |
 | `retry` | Exponential backoff with full jitter; policy calculator, not a loop runner |
 
+## Writing a module
+
+Start with [`docs/writing-a-module.md`](docs/writing-a-module.md) — the Module interface,
+the Host surface, health semantics, the manifest, and testing with `testkit.StubCore`. Then
+copy [`sysinfo`](https://github.com/deploymenttheory/weaveplatform-agent-modules/tree/main/sysinfo),
+which exists to be copied.
+
 ## Rules
 
 - **Host is closed by default** (spec §5). This SDK grows by design review, not accretion.
