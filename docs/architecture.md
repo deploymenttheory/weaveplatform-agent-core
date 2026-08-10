@@ -116,6 +116,12 @@ The start limit (systemd's `StartLimitBurst`, not a Fowler circuit breaker — t
 half-open probe) pins the module down rather than restarting forever; a rollback or operator
 action resets it. Crash counts only reset after the module proves stable (60s up).
 
+Liveness is watched two ways. Core **polls** `ModuleService.Health` on the module's requested
+cadence, and the module **pushes** a watchdog ping (the sd_notify WATCHDOG shape) over
+`WatchdogService` every interval core sets in `InitRequest`. A module silent past two
+intervals is restarted — a proactive signal that catches a module which can no longer
+maintain its keepalive stream, without waiting on the next poll.
+
 ## Module install: stage → promote → rollback
 
 The lifecycle manager (`internal/lifecycle`) owns install. Verify-before-exec is
@@ -142,9 +148,12 @@ flowchart LR
 
 The same shape applies one level up: **weaveboot** replaces core itself. An updater leaves a
 new core under `core/staging/`; weaveboot promotes it at loop start and reverts a version
-that cannot stay up. The installed footprint (launchd plist, service registration, signing
-identity — see [`../pkg/README.md`](../pkg/README.md)) never changes; only the binaries
-behind it do.
+that cannot stay up. A promoted core is confirmed on **readiness, not uptime**: once modules
+are registered and the control socket is up, core writes a readiness marker weaveboot cleared
+before launch, so its presence proves the new core loads and configures — a fast, health-based
+promotion gate, with the uptime timer as the fallback. The installed footprint (launchd plist,
+service registration, signing identity — see [`../pkg/README.md`](../pkg/README.md)) never
+changes; only the binaries behind it do.
 
 ```mermaid
 stateDiagram-v2
