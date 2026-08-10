@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.1.0 (2026-08-10)
+
+
+### Features
+
+* adopt architecture spec, strip template scaffolding ([17db931](https://github.com/deploymenttheory/weaveplatform-agent/commit/17db9316fe60e49e4807b6f77be51dbaae0f5b81))
+* core skeleton — supervision, host services, control socket, weavectl ([55d35d2](https://github.com/deploymenttheory/weaveplatform-agent/commit/55d35d22126f1c235d50c5e9c7e84db12a5a3088))
+* device identity with enrolment, transport mux with offline queue ([eb6a457](https://github.com/deploymenttheory/weaveplatform-agent/commit/eb6a457122ab63816dd20bfe13de325889ee269f))
+* encrypted store and policy pipeline ([402b837](https://github.com/deploymenttheory/weaveplatform-agent/commit/402b837cf2fd6fc9b7529981e157c9e9fc665def))
+* module lifecycle — staged install, health-gated promote, rollback ([016bc15](https://github.com/deploymenttheory/weaveplatform-agent/commit/016bc15294c27fdabe4fd199382342652667df12))
+* verify-before-exec and privilege drop ([7c7e2e2](https://github.com/deploymenttheory/weaveplatform-agent/commit/7c7e2e23e4d3229acf9669777dc1251b8d3b5cba))
+* weaveboot staged core replacement with crash-loop revert ([1fdbf2f](https://github.com/deploymenttheory/weaveplatform-agent/commit/1fdbf2f7366b76e9381cf0c90de2073f4ac3fb7e))
+
+
+### Miscellaneous Chores
+
+* set initial release version ([4603b82](https://github.com/deploymenttheory/weaveplatform-agent/commit/4603b82817fee468fdedb0cf7888801093757cd4))
+
 ## [Unreleased]
 
 ### Added
