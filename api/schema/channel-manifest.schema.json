@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/deploymenttheory/weaveplatform-api/schema/channel-manifest.schema.json",
+  "title": "Weave channel manifest",
+  "description": "A signed document mapping a channel to a known-good set of core and module versions and the protocol they assume. SaaS follows a rolling manifest; self-hosted pins one. Same mechanism, different policy. Signature is a detached minisign-style Ed25519 signature beside the file.",
+  "type": "object",
+  "required": ["schema", "channel", "generated_at", "protocol", "core", "modules"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": 1 },
+    "channel": {
+      "type": "string",
+      "description": "Channel name, e.g. \"stable\", or a pinned service version, e.g. \"pinned/1.14.0\"."
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "protocol": {
+      "type": "object",
+      "required": ["min", "max"],
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "integer", "minimum": 1 },
+        "max": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "go-bindings-* versions pinned by the current protocol, e.g. {\"go-bindings-macosplatform\": \"v0.18.0\"}."
+    },
+    "core": {
+      "type": "object",
+      "required": ["version", "artifacts"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" },
+        "artifacts": { "$ref": "#/$defs/artifacts" }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "protocol", "privilege", "session", "artifacts"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "protocol": { "type": "integer" },
+          "privilege": { "enum": ["system", "service", "user"] },
+          "session": { "enum": ["system", "per-user-console", "per-user-all"] },
+          "capabilities": { "type": "array", "items": { "type": "string" } },
+          "signing": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "apple_team_id": { "type": "string" },
+              "authenticode_subject": { "type": "string" }
+            }
+          },
+          "artifacts": { "$ref": "#/$defs/artifacts" }
+        }
+      },
+      "description": "The distribution subset of each module's manifest, so core gates fetch/exec decisions on signed data before it possesses the binary."
+    }
+  },
+  "$defs": {
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["os", "arch", "url", "digest", "size"],
+        "additionalProperties": false,
+        "properties": {
+          "os": { "enum": ["darwin", "windows", "linux"] },
+          "arch": { "enum": ["arm64", "amd64"] },
+          "url": { "type": "string" },
+          "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+          "size": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

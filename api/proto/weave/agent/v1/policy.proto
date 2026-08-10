@@ -1,0 +1,26 @@
+// PolicyService is served by core on the per-module host socket. Core
+// fetches, verifies and caches policy; modules read and watch. What is in a
+// policy document is the module's business — core delivers, it does not
+// interpret. Host-delivered policy is authoritative over anything local.
+
+syntax = "proto3";
+
+package weave.agent.v1;
+
+service PolicyService {
+  rpc Get(PolicyGetRequest) returns (PolicyDocument);
+  // Watch streams the current document immediately, then again on every
+  // change, until the connection closes.
+  rpc Watch(PolicyWatchRequest) returns (stream PolicyDocument);
+}
+
+message PolicyGetRequest {}
+
+message PolicyWatchRequest {}
+
+message PolicyDocument {
+  // Monotonic revision of the document as delivered to this module.
+  uint64 revision = 1;
+  // The module-scoped policy payload, opaque to core.
+  bytes data = 2;
+}
