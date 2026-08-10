@@ -11,11 +11,11 @@ import (
 	"sync"
 	"time"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/capability"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
+	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-api/manifest"
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
 	"github.com/deploymenttheory/weaveplatform-sdk/retry"
 )

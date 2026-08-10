@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/capability"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/controlsock"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
@@ -19,6 +18,7 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/version"
+	"github.com/deploymenttheory/weaveplatform-api/manifest"
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
 )
 

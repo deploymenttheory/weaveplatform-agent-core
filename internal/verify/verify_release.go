@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
+	"github.com/deploymenttheory/weaveplatform-api/manifest"
 )
 
 // newVerifier (release): fail closed until codesign/WinVerifyTrust land.

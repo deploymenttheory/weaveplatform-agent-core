@@ -8,10 +8,10 @@ import (
 	"log/slog"
 	"time"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	controlv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/control/v1"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/version"
+	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
+	controlv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/control/v1"
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
 	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
 	"google.golang.org/grpc"
