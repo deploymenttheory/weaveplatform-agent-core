@@ -16,6 +16,8 @@ import (
 	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
 	"github.com/deploymenttheory/weaveplatform-sdk/wlog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 // Serve runs m as a Weave platform module: it reads the handshake
@@ -83,6 +85,15 @@ func serve(m Module, log *slog.Logger) error {
 	}
 	grpcServer := grpc.NewServer()
 	agentv1.RegisterModuleServiceServer(grpcServer, srv)
+	// Serve the standard gRPC health protocol alongside the rich
+	// ModuleService.Health: generic tooling (grpc_health_probe, meshes)
+	// can liveness-check a module, while core keeps using ModuleService for
+	// the DEGRADED/UNHEALTHY nuance stock health lacks. The SDK reports
+	// SERVING once the module is up.
+	healthSrv := health.NewServer()
+	healthpb.RegisterHealthServer(grpcServer, healthSrv)
+	healthSrv.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
+	healthSrv.SetServingStatus(m.ID(), healthpb.HealthCheckResponse_SERVING)
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- grpcServer.Serve(lis) }()

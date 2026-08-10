@@ -53,7 +53,10 @@ type ConfigReceiver interface {
 }
 
 // Host is what core offers a module. It is closed by default: growing this
-// interface is an architecture decision, not a pull request.
+// interface is an architecture decision, not a pull request. Note what is
+// deliberately absent: Schedule (in-process timer sugar — see Scheduled)
+// and Platform (OS bindings can't cross a wire; link the platform seam
+// directly).
 type Host interface {
 	Identity() Identity
 	Transport() Transport
@@ -64,10 +67,16 @@ type Host interface {
 	Store(ns string) Store
 	Events() Events
 	UI() UIBroker
-	// Schedule registers a recurring job. Jobs run after Start and stop
-	// with the module.
-	Schedule(Job)
 	Log() *slog.Logger
+}
+
+// Scheduled is optionally implemented by a module that wants recurring
+// work. The runtime collects Jobs after Init, runs each once at Start and
+// then on its interval, and cancels them at Stop. Scheduling is in-process
+// SDK sugar — nothing crosses to core — so it is a module-side interface,
+// not a Host method.
+type Scheduled interface {
+	Jobs() []Job
 }
 
 // Identity answers who this device is. Modules never see private keys.
@@ -122,6 +131,11 @@ type Transport interface {
 type PolicyDocument struct {
 	Revision uint64
 	Data     []byte
+	// SchemaVersion and ContentType are module-owned envelope metadata so a
+	// module can evolve its policy shape safely (core never interprets the
+	// payload). Zero/empty when the server didn't set them.
+	SchemaVersion uint32
+	ContentType   string
 }
 
 // PolicyReader reads and watches this module's policy. Host-delivered
@@ -147,6 +161,10 @@ type Event struct {
 	Topic       string
 	Data        []byte
 	PublishedAt time.Time
+	// Sequence is a monotonic per-topic counter. A gap versus the last
+	// Sequence a subscriber saw for a topic means it missed events
+	// (delivery is at-most-once) and should re-pull state.
+	Sequence uint64
 }
 
 // Events is the inter-module bus. Modules do not import each other; this

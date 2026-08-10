@@ -175,6 +175,17 @@ func (c transportClient) Receive(ctx context.Context) (<-chan Message, error) {
 
 func (h *hostClient) Policy() PolicyReader { return policyClient{h} }
 
+// policyDoc maps the wire document to the SDK type, including the envelope
+// metadata (schema version, content type).
+func policyDoc(doc *agentv1.PolicyDocument) PolicyDocument {
+	return PolicyDocument{
+		Revision:      doc.GetRevision(),
+		Data:          doc.GetData(),
+		SchemaVersion: doc.GetSchemaVersion(),
+		ContentType:   doc.GetContentType(),
+	}
+}
+
 type policyClient struct{ h *hostClient }
 
 func (c policyClient) Get(ctx context.Context) (PolicyDocument, error) {
@@ -182,7 +193,7 @@ func (c policyClient) Get(ctx context.Context) (PolicyDocument, error) {
 	if err != nil {
 		return PolicyDocument{}, err
 	}
-	return PolicyDocument{Revision: doc.GetRevision(), Data: doc.GetData()}, nil
+	return policyDoc(doc), nil
 }
 
 func (c policyClient) Watch(ctx context.Context) (<-chan PolicyDocument, error) {
@@ -199,7 +210,7 @@ func (c policyClient) Watch(ctx context.Context) (<-chan PolicyDocument, error) 
 				return
 			}
 			select {
-			case out <- PolicyDocument{Revision: doc.GetRevision(), Data: doc.GetData()}:
+			case out <- policyDoc(doc):
 			case <-ctx.Done():
 				return
 			}
@@ -286,6 +297,7 @@ func (c eventsClient) Subscribe(ctx context.Context, topics ...string) (<-chan E
 				Topic:       ev.GetTopic(),
 				Data:        ev.GetData(),
 				PublishedAt: time.UnixMilli(ev.GetPublishedAtMs()),
+				Sequence:    ev.GetSequence(),
 			}:
 			case <-ctx.Done():
 				return
@@ -325,14 +337,12 @@ func (h *hostClient) declaredSurfaces() []*agentv1.Surface {
 
 // --- Schedule ---
 
-func (h *hostClient) Schedule(j Job) {
+// addJobs records the module's declared jobs (from Scheduled.Jobs) before
+// Start. The runtime, not the module, owns their lifecycle.
+func (h *hostClient) addJobs(jobs []Job) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.jobs = append(h.jobs, j)
-	if h.jobCancel != nil {
-		// Already started: run the new job immediately.
-		h.launchJobLocked(j)
-	}
+	h.jobs = append(h.jobs, jobs...)
 }
 
 // startJobs begins all registered jobs. Called by the runtime on Start.

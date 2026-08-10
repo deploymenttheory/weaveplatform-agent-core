@@ -86,6 +86,12 @@ func (s *moduleServer) Init(ctx context.Context, req *agentv1.InitRequest) (*age
 	}
 	s.state = stateInited
 
+	// Collect the module's recurring jobs (if any) now; the runtime owns
+	// their lifecycle — started at Start, cancelled at Stop.
+	if sched, ok := s.m.(Scheduled); ok {
+		host.addJobs(sched.Jobs())
+	}
+
 	// Watch the host connection: if core dies, exit rather than orphan.
 	if s.hostLost != nil {
 		go host.awaitDisconnect(func() {
