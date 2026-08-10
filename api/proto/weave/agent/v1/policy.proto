@@ -23,4 +23,11 @@ message PolicyDocument {
   uint64 revision = 1;
   // The module-scoped policy payload, opaque to core.
   bytes data = 2;
+  // schema_version lets a module evolve its policy shape safely: a module
+  // rolled back to an older version can tell that a document was authored
+  // for a newer schema. Owned by the module, not interpreted by core.
+  uint32 schema_version = 3;
+  // content_type describes the payload encoding (e.g. "application/json").
+  // Also module-owned; core delivers, it does not parse.
+  string content_type = 4;
 }

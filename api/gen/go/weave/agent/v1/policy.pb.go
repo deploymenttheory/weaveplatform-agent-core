@@ -103,7 +103,14 @@ type PolicyDocument struct {
 	// Monotonic revision of the document as delivered to this module.
 	Revision uint64 `protobuf:"varint,1,opt,name=revision,proto3" json:"revision,omitempty"`
 	// The module-scoped policy payload, opaque to core.
-	Data          []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	// schema_version lets a module evolve its policy shape safely: a module
+	// rolled back to an older version can tell that a document was authored
+	// for a newer schema. Owned by the module, not interpreted by core.
+	SchemaVersion uint32 `protobuf:"varint,3,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	// content_type describes the payload encoding (e.g. "application/json").
+	// Also module-owned; core delivers, it does not parse.
+	ContentType   string `protobuf:"bytes,4,opt,name=content_type,json=contentType,proto3" json:"content_type,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -152,16 +159,32 @@ func (x *PolicyDocument) GetData() []byte {
 	return nil
 }
 
+func (x *PolicyDocument) GetSchemaVersion() uint32 {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return 0
+}
+
+func (x *PolicyDocument) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
+}
+
 var File_weave_agent_v1_policy_proto protoreflect.FileDescriptor
 
 const file_weave_agent_v1_policy_proto_rawDesc = "" +
 	"\n" +
 	"\x1bweave/agent/v1/policy.proto\x12\x0eweave.agent.v1\"\x12\n" +
 	"\x10PolicyGetRequest\"\x14\n" +
-	"\x12PolicyWatchRequest\"@\n" +
+	"\x12PolicyWatchRequest\"\x8a\x01\n" +
 	"\x0ePolicyDocument\x12\x1a\n" +
 	"\brevision\x18\x01 \x01(\x04R\brevision\x12\x12\n" +
-	"\x04data\x18\x02 \x01(\fR\x04data2\xa7\x01\n" +
+	"\x04data\x18\x02 \x01(\fR\x04data\x12%\n" +
+	"\x0eschema_version\x18\x03 \x01(\rR\rschemaVersion\x12!\n" +
+	"\fcontent_type\x18\x04 \x01(\tR\vcontentType2\xa7\x01\n" +
 	"\rPolicyService\x12G\n" +
 	"\x03Get\x12 .weave.agent.v1.PolicyGetRequest\x1a\x1e.weave.agent.v1.PolicyDocument\x12M\n" +
 	"\x05Watch\x12\".weave.agent.v1.PolicyWatchRequest\x1a\x1e.weave.agent.v1.PolicyDocument0\x01B\xc8\x01\n" +

@@ -33,6 +33,11 @@ type Event struct {
 	Data  []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	// Core-stamped publish time, Unix milliseconds.
 	PublishedAtMs int64 `protobuf:"varint,3,opt,name=published_at_ms,json=publishedAtMs,proto3" json:"published_at_ms,omitempty"`
+	// sequence is a monotonic per-topic counter stamped by core. Delivery is
+	// still at-most-once, but a gap in the sequence lets a subscriber detect
+	// that it missed events (e.g. across a reconnect) and re-pull state,
+	// rather than silently losing them.
+	Sequence      uint64 `protobuf:"varint,4,opt,name=sequence,proto3" json:"sequence,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -84,6 +89,13 @@ func (x *Event) GetData() []byte {
 func (x *Event) GetPublishedAtMs() int64 {
 	if x != nil {
 		return x.PublishedAtMs
+	}
+	return 0
+}
+
+func (x *Event) GetSequence() uint64 {
+	if x != nil {
+		return x.Sequence
 	}
 	return 0
 }
@@ -226,11 +238,12 @@ var File_weave_agent_v1_events_proto protoreflect.FileDescriptor
 
 const file_weave_agent_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x1bweave/agent/v1/events.proto\x12\x0eweave.agent.v1\"Y\n" +
+	"\x1bweave/agent/v1/events.proto\x12\x0eweave.agent.v1\"u\n" +
 	"\x05Event\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\x12&\n" +
-	"\x0fpublished_at_ms\x18\x03 \x01(\x03R\rpublishedAtMs\":\n" +
+	"\x0fpublished_at_ms\x18\x03 \x01(\x03R\rpublishedAtMs\x12\x1a\n" +
+	"\bsequence\x18\x04 \x01(\x04R\bsequence\":\n" +
 	"\x0ePublishRequest\x12\x14\n" +
 	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\"\x11\n" +

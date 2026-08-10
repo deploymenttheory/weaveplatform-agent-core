@@ -18,6 +18,11 @@ message Event {
   bytes data = 2;
   // Core-stamped publish time, Unix milliseconds.
   int64 published_at_ms = 3;
+  // sequence is a monotonic per-topic counter stamped by core. Delivery is
+  // still at-most-once, but a gap in the sequence lets a subscriber detect
+  // that it missed events (e.g. across a reconnect) and re-pull state,
+  // rather than silently losing them.
+  uint64 sequence = 4;
 }
 
 message PublishRequest {

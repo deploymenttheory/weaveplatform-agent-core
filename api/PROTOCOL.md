@@ -54,10 +54,21 @@ the length of the window. The old package is deleted only when it falls out of t
 
 ## Bindings pinning
 
-Protocol N declares the `go-bindings-*` versions its participants build against, recorded in
-the channel manifest's `bindings` block. A bindings bump that changes behaviour is a protocol
-event. This prevents a two-year-old module linking bindings whose behaviour core no longer
-expects.
+The `go-bindings-*` versions the current protocol expects are recorded in the channel
+manifest's `bindings` block and version on **their own cadence** — a bindings bump is a
+*channel* event (re-sign the manifest), not a protocol-integer bump and not a proto-package
+fork. Decoupling the two keeps a library refresh from forcing every module to rebuild against
+a new `weave/agent/vN` when no wire byte changed. The integer moves only for wire-visible
+changes (see above); the manifest's `bindings` block is where "which library the fleet runs"
+is pinned and rolled.
+
+## Additive change, worked example
+
+The policy envelope (`schema_version`, `content_type` on `PolicyDocument`), event sequence
+numbers (`sequence` on `Event`), and the standard `grpc.health.v1` service were all added
+under protocol **1**: new optional fields and a new service are wire-compatible, so by the
+rules above they do not bump the integer. A protocol-2 package is minted only when a genuinely
+breaking change lands, at which point `test/protocompat/v2` is added beside `v1`.
 
 ## The handshake
 
