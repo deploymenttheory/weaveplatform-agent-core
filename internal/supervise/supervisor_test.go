@@ -154,6 +154,74 @@ func TestModuleRunsAndRestartsAfterKill(t *testing.T) {
 	}
 }
 
+// TestWatchdogSatisfiedByHealthyModule proves the push watchdog end to end:
+// with an interval set and the Keepalive seam wired, a real module built on
+// the SDK pings on its own cadence, so the supervisor must NOT restart it.
+// (A false positive here would mean the ping loop, the WatchdogService, or
+// the monitor freshness check is broken.)
+func TestWatchdogSatisfiedByHealthyModule(t *testing.T) {
+	bin := buildTestModule(t)
+	sup := newTestSupervisor(t)
+	// Whole seconds: InitRequest carries the interval in seconds, so a
+	// sub-second value truncates to zero (disabled).
+	sup.WatchdogInterval = time.Second
+	sup.Services.Watchdog = sup.Keepalive
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sup.SetBaseContext(ctx)
+
+	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err != nil {
+		t.Fatal(err)
+	}
+	st := waitState(t, sup, StateRunning, 15*time.Second)
+
+	// Observe across several watchdog deadlines (2×1s). A pinging module
+	// stays up with the same PID and zero restarts.
+	time.Sleep(3 * time.Second)
+	final := sup.Statuses()[0]
+	if final.State != StateRunning {
+		t.Fatalf("healthy pinging module state = %s, want running", final.State)
+	}
+	if final.Restarts != 0 {
+		t.Fatalf("healthy pinging module restarted %d times; watchdog false positive", final.Restarts)
+	}
+	if final.PID != st.PID {
+		t.Fatalf("PID changed (%d→%d): module was restarted under a satisfied watchdog", st.PID, final.PID)
+	}
+
+	cancel()
+	sup.Wait()
+}
+
+// TestWatchdogRestartsOnMissedPings proves the restart path fires: with the
+// interval set but the Keepalive seam left unwired, the module's pings never
+// advance the supervisor's liveness clock (as if the keepalive stream had
+// broken), so once the deadline (2×interval) lapses the module is killed and
+// relaunched.
+func TestWatchdogRestartsOnMissedPings(t *testing.T) {
+	bin := buildTestModule(t)
+	sup := newTestSupervisor(t)
+	sup.WatchdogInterval = time.Second
+	// Deliberately do NOT wire sup.Services.Watchdog: pings arrive at core
+	// but are dropped, so the liveness clock goes stale.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sup.SetBaseContext(ctx)
+
+	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, sup, StateRunning, 15*time.Second)
+
+	// Within a few deadlines the stale clock must force at least one restart.
+	waitFor(t, sup, "watchdog-forced restart", 15*time.Second, func(s Status) bool {
+		return s.Restarts >= 1
+	})
+
+	cancel()
+	sup.Wait()
+}
+
 func TestBreakerTripsOnCrashLoop(t *testing.T) {
 	bin := buildTestModule(t)
 	sup := newTestSupervisor(t)

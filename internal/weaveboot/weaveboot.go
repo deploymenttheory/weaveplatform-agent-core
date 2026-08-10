@@ -69,6 +69,8 @@ func Run(ctx context.Context, o Options) error {
 		backoff = 2 * time.Second
 	}
 
+	readyFile := filepath.Join(o.CoreDir, "ready")
+
 	crashes := 0
 	for ctx.Err() == nil {
 		promoteStaged(o)
@@ -77,15 +79,24 @@ func Run(ctx context.Context, o Options) error {
 		if err != nil {
 			return fmt.Errorf("weaveboot: %w", err)
 		}
+		// Clear any marker from a previous run so its presence after this
+		// run unambiguously means this core reached readiness.
+		os.Remove(readyFile) //nolint:errcheck
 		o.Log.Info("starting core", "version", version, "bin", bin)
 		started := time.Now()
-		err = runOnce(ctx, bin, o.AgentArgs)
+		err = runOnce(ctx, bin, o.AgentArgs, readyFile)
 		if ctx.Err() != nil {
 			return nil
 		}
-		o.Log.Warn("core exited", "version", version, "after", time.Since(started), "err", err)
+		becameReady := markerFresh(readyFile)
+		o.Log.Warn("core exited", "version", version, "after", time.Since(started),
+			"became_ready", becameReady, "err", err)
 
-		if time.Since(started) >= stable {
+		// A core that signalled readiness proved the promote is good (it
+		// loads and configures), so a later crash is a runtime fault, not a
+		// bad promote — don't count it toward revert. Uptime remains the
+		// fallback for a core too old to write the marker.
+		if becameReady || time.Since(started) >= stable {
 			crashes = 0
 			continue
 		}
@@ -112,10 +123,25 @@ func Run(ctx context.Context, o Options) error {
 	return nil
 }
 
-func runOnce(ctx context.Context, bin string, args []string) error {
+// EnvReadyFile names the env var weaveboot sets so core knows where to
+// write its readiness marker. Core reads the same name (core.envReadyFile).
+const EnvReadyFile = "WEAVE_READY_FILE"
+
+// markerFresh reports whether core wrote its readiness marker during this
+// run. weaveboot removes the marker before each launch, so its presence is
+// proof this core reached steady state — the version-string source (build
+// ldflags vs. directory name) may differ, so presence, not content, is the
+// signal.
+func markerFresh(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func runOnce(ctx context.Context, bin string, args []string, readyFile string) error {
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), EnvReadyFile+"="+readyFile)
 	// On ctx cancel (service stop), send the graceful terminate signal so
 	// core runs its shutdown path (drain modules, close the store) instead
 	// of the default SIGKILL. WaitDelay then bounds how long we wait before

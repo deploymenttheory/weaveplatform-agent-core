@@ -157,7 +157,15 @@ func Run(ctx context.Context, opts Options) error {
 		Services: services,
 		Layout:   lay,
 		Verifier: verifier,
+		// Ask modules to ping every 10s; a module silent for 20s (two
+		// intervals) is restarted as hung. Catches hangs that Health
+		// polling, answered on a separate goroutine, would miss.
+		WatchdogInterval: 10 * time.Second,
 	}
+	// Close the watchdog loop: each module's pings reach the supervisor
+	// through this seam (set after sup exists to break the construction
+	// cycle between services and sup).
+	services.Watchdog = sup.Keepalive
 	// Modules live on the core run-lifetime context, never on the context
 	// of whatever operation (boot loop, control-socket install) spawned
 	// them.
@@ -226,6 +234,12 @@ func Run(ctx context.Context, opts Options) error {
 	ctlErr := make(chan error, 1)
 	go func() { ctlErr <- ctl.Serve(ctx, lay.ControlSocket()) }()
 
+	// Readiness signal to weaveboot: once modules are registered and the
+	// control socket is being served, this core is up. weaveboot promotes a
+	// staged core on this signal (health-gated) rather than on a blind
+	// uptime timer — a core that reaches here proves it loads and configures.
+	signalReady(log)
+
 	select {
 	case <-ctx.Done():
 	case err := <-ctlErr:
@@ -236,6 +250,33 @@ func Run(ctx context.Context, opts Options) error {
 	log.Info("core stopping")
 	sup.Wait()
 	return nil
+}
+
+// envReadyFile is the path weaveboot asks core to write its readiness
+// marker to (weaveboot sets it before exec). Empty when core is run
+// directly (dev), in which case signalReady is a no-op. Must match
+// weaveboot.EnvReadyFile.
+const envReadyFile = "WEAVE_READY_FILE"
+
+// signalReady writes core's version to the readiness marker weaveboot
+// watches, atomically (temp + rename). weaveboot cleared any prior marker
+// before launch, so its presence means this run reached steady state.
+// Failure to write is logged, never fatal — a missing marker only costs
+// weaveboot its faster promotion path; it falls back to the uptime timer.
+func signalReady(log *slog.Logger) {
+	path := os.Getenv(envReadyFile)
+	if path == "" {
+		return
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(version.Version+"\n"), 0o600); err != nil {
+		log.Warn("writing readiness marker failed", "err", err)
+		return
+	}
+	if err := os.Rename(tmp, path); err != nil { //nolint:gosec // atomic publish of a marker core itself wrote
+		log.Warn("publishing readiness marker failed", "err", err)
+		os.Remove(tmp) //nolint:errcheck
+	}
 }
 
 // discoverModules scans dir for <id>/module.manifest.json + binary. The

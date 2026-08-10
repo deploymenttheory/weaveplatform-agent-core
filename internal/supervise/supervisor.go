@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/capability"
@@ -59,6 +60,11 @@ type Supervisor struct {
 	// StableAfter is how long a module must stay up before its crash
 	// count resets. Zero gets 60s.
 	StableAfter time.Duration
+	// WatchdogInterval is the cadence core asks modules to ping via
+	// WatchdogService (sd_notify WATCHDOG shape). A module that misses two
+	// intervals is restarted — this catches a hung-but-alive module that
+	// answers Health from a separate goroutine. Zero disables the watchdog.
+	WatchdogInterval time.Duration
 
 	// baseCtx is the run-lifetime context every runner derives from. It
 	// is deliberately NOT the caller's context on Add/Replace: an install
@@ -127,6 +133,23 @@ func (s *Supervisor) backoff() retry.Backoff {
 		return s.Backoff
 	}
 	return retry.New()
+}
+
+// watchdogInterval is the module ping cadence; zero means the watchdog is
+// disabled (no default — core opts in explicitly).
+func (s *Supervisor) watchdogInterval() time.Duration {
+	return s.WatchdogInterval
+}
+
+// Keepalive records a watchdog ping from the named module. Called from the
+// hostserv WatchdogService handler on the module's own cadence.
+func (s *Supervisor) Keepalive(module string) {
+	s.mu.Lock()
+	r := s.runners[module]
+	s.mu.Unlock()
+	if r != nil {
+		r.keepalive.Store(time.Now().UnixNano())
+	}
 }
 
 func (s *Supervisor) capabilityList() []*agentv1.Capability {
@@ -253,6 +276,11 @@ type runner struct {
 	wg     sync.WaitGroup
 	cancel context.CancelFunc
 
+	// keepalive is the unix-nanos time of the last watchdog ping, stamped
+	// by the hostserv WatchdogService handler and read by monitor. Atomic
+	// because the two run on different goroutines.
+	keepalive atomic.Int64
+
 	mu       sync.Mutex
 	state    State
 	detail   string
@@ -378,6 +406,20 @@ func (r *runner) monitor(ctx context.Context, p *proc) bool {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
+	// Watchdog: if enabled, a module that has not pinged within two
+	// intervals is restarted, catching a hung-but-alive module that still
+	// answers Health on a separate goroutine. Seed the clock at launch so
+	// the module gets a full deadline to send its first ping.
+	wdInterval := r.sup.watchdogInterval()
+	var wdTicker *time.Ticker
+	var wdC <-chan time.Time
+	if wdInterval > 0 {
+		r.keepalive.Store(time.Now().UnixNano())
+		wdTicker = time.NewTicker(wdInterval)
+		defer wdTicker.Stop()
+		wdC = wdTicker.C
+	}
+
 	// Poll once immediately so r.health is populated within the launch
 	// rather than after a full interval — the promote health gate depends
 	// on seeing a status promptly, and the default interval is 30s.
@@ -398,6 +440,14 @@ func (r *runner) monitor(ctx context.Context, p *proc) bool {
 			return false
 		case <-ticker.C:
 			if r.pollHealth(ctx, p, &strikes) {
+				p.kill()
+				return false
+			}
+		case <-wdC:
+			last := time.Unix(0, r.keepalive.Load())
+			if time.Since(last) > 2*wdInterval {
+				r.log.Warn("watchdog deadline missed; restarting module",
+					"last_ping", last, "deadline", 2*wdInterval)
 				p.kill()
 				return false
 			}

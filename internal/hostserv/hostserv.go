@@ -12,6 +12,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"errors"
+	"io"
 	"log/slog"
 	"strings"
 
@@ -114,11 +115,14 @@ type Services struct {
 	Policy    PolicyBackend
 	Identity  IdentityBackend
 	Transport TransportBackend
+	// Watchdog, if set, is called with the module id on every watchdog
+	// ping so the supervisor can track liveness. Nil disables the seam.
+	Watchdog func(module string)
 }
 
-// NewServer builds the per-module gRPC server: all five host services,
-// bound to the module's identity, gated by its token. subscribes is the
-// module's declared event-topic allow-list (from its manifest).
+// NewServer builds the per-module gRPC server: all host services, bound to
+// the module's identity, gated by its token. subscribes is the module's
+// declared event-topic allow-list (from its manifest).
 func (s *Services) NewServer(moduleID, token string, subscribes []string) *grpc.Server {
 	srv := grpc.NewServer(tokenGate(token)...)
 	agentv1.RegisterStoreServiceServer(srv, &storeServer{s: s, module: moduleID})
@@ -127,6 +131,7 @@ func (s *Services) NewServer(moduleID, token string, subscribes []string) *grpc.
 	agentv1.RegisterIdentityServiceServer(srv, &identityServer{s: s, module: moduleID})
 	agentv1.RegisterTransportServiceServer(srv, &transportServer{s: s, module: moduleID})
 	agentv1.RegisterLogServiceServer(srv, &logServer{s: s, module: moduleID})
+	agentv1.RegisterWatchdogServiceServer(srv, &watchdogServer{s: s, module: moduleID})
 	return srv
 }
 
@@ -428,4 +433,33 @@ func slogArgs(kv []any) []slog.Attr {
 		out = append(out, slog.Any(key, kv[i+1]))
 	}
 	return out
+}
+
+// --- Watchdog ---
+
+type watchdogServer struct {
+	agentv1.UnimplementedWatchdogServiceServer
+	s      *Services
+	module string
+}
+
+// Notify receives the module's watchdog pings and reports each to the
+// supervisor via the Watchdog seam, so a module that stops pinging within
+// the deadline gets restarted. The stream lives for the module's runtime;
+// its close (module Stop) is a normal end, not an error.
+func (v *watchdogServer) Notify(stream grpc.ClientStreamingServer[agentv1.WatchdogPing, agentv1.WatchdogSummary]) error {
+	var received uint64
+	for {
+		ping, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return stream.SendAndClose(&agentv1.WatchdogSummary{Received: received})
+			}
+			return err
+		}
+		received = ping.GetSequence()
+		if v.s.Watchdog != nil {
+			v.s.Watchdog(v.module)
+		}
+	}
 }

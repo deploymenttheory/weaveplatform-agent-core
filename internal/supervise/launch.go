@@ -164,11 +164,12 @@ func (r *runner) launch(ctx context.Context) (*proc, error) {
 	initCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	initResp, err := client.Init(initCtx, &agentv1.InitRequest{
-		Protocol:     line.Protocol,
-		ModuleId:     spec.Manifest.ID,
-		Capabilities: r.sup.capabilityList(),
-		Config:       spec.Config,
-		Privilege:    privilegeLevel(spec.Manifest),
+		Protocol:                line.Protocol,
+		ModuleId:                spec.Manifest.ID,
+		Capabilities:            r.sup.capabilityList(),
+		Config:                  spec.Config,
+		Privilege:               privilegeLevel(spec.Manifest),
+		WatchdogIntervalSeconds: uint32(r.sup.watchdogInterval().Seconds()),
 	})
 	if err != nil {
 		conn.Close() //nolint:errcheck
