@@ -34,6 +34,10 @@ type Platform struct {
 type Signing struct {
 	AppleTeamID         string `json:"apple_team_id,omitempty"`
 	AuthenticodeSubject string `json:"authenticode_subject,omitempty"`
+	// AuthenticodeThumbprint pins the signing certificate's SHA-1
+	// thumbprint (40 hex chars, case-insensitive). When set, the Windows
+	// verifier pins on it rather than the mutable subject display name.
+	AuthenticodeThumbprint string `json:"authenticode_thumbprint,omitempty"`
 }
 
 // Artifact is one published binary, stamped by CI.
