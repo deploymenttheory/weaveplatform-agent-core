@@ -1,0 +1,59 @@
+# Builds and attaches the release binaries when release-please tags a
+# release.
+#
+# release-please owns the version, the changelog and the GitHub release
+# itself; this only builds the artifacts and appends them. A failure here
+# leaves the release intact rather than half-made, and the run can be
+# repeated without re-tagging.
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  goreleaser:
+    name: 📦 Build and sign release archives
+    runs-on: ubuntu-latest
+    permissions:
+      # Attaching the archives to the release.
+      contents: write
+      # Keyless signing: cosign exchanges this token for a short-lived
+      # certificate naming this workflow.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # goreleaser derives the version from the tag, which needs the
+          # tags and the history behind them.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # weaveplatform-api and -sdk are private modules.
+      - name: Configure private module access
+        env:
+          TOKEN: ${{ secrets.GOMODULES_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::GOMODULES_TOKEN secret is not set — required to fetch private weaveplatform modules"
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${TOKEN}@github.com/deploymenttheory/".insteadOf "https://github.com/deploymenttheory/"
+          echo "GOPRIVATE=github.com/deploymenttheory/*" >> "$GITHUB_ENV"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Run goreleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

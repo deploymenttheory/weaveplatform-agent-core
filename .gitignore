@@ -48,3 +48,5 @@ __pycache__/
 *.exe
 *.dylib
 *.so
+# goreleaser output
+dist/
