@@ -23,8 +23,9 @@ type Config struct {
 
 // Module implements modulesdk.Module.
 type Module struct {
-	host modulesdk.Host
-	cfg  Config
+	host      modulesdk.Host
+	cfg       Config
+	stopWatch context.CancelFunc
 
 	mu            sync.Mutex
 	interval      time.Duration
@@ -55,11 +56,15 @@ func (m *Module) Init(ctx context.Context, host modulesdk.Host) error {
 	// WEAVE_CONFIG seam — the runtime hands it to us at Init.)
 	m.interval = time.Duration(m.cfg.IntervalSeconds) * time.Second
 
-	// Policy over config: read once now, then watch.
+	// Policy over config: read once now, then watch. The watch must
+	// outlive Init — its context is the module's lifetime, not the Init
+	// RPC's (which is cancelled the moment Init returns).
 	if doc, err := host.Policy().Get(ctx); err == nil {
 		m.applyPolicy(doc)
 	}
-	watch, err := host.Policy().Watch(ctx)
+	watchCtx, cancel := context.WithCancel(context.Background())
+	m.stopWatch = cancel
+	watch, err := host.Policy().Watch(watchCtx)
 	if err == nil {
 		go func() {
 			for doc := range watch {
@@ -95,7 +100,12 @@ func (m *Module) SetConfig(doc []byte) error {
 func (m *Module) Start(ctx context.Context) error { return nil }
 
 // Stop implements modulesdk.Module.
-func (m *Module) Stop(ctx context.Context) error { return nil }
+func (m *Module) Stop(ctx context.Context) error {
+	if m.stopWatch != nil {
+		m.stopWatch()
+	}
+	return nil
+}
 
 // Health implements modulesdk.Module: healthy while collections succeed
 // within 2× the interval; degraded (not unhealthy) when they stale — a
