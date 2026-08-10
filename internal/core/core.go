@@ -16,6 +16,9 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
+	"github.com/deploymenttheory/weaveplatform-agent/internal/policy"
+	"github.com/deploymenttheory/weaveplatform-agent/internal/store"
+	"github.com/deploymenttheory/weaveplatform-agent/internal/store/keyprotect"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/version"
 	"github.com/deploymenttheory/weaveplatform-api/manifest"
@@ -37,7 +40,12 @@ type Options struct {
 	// Verifier authenticates module binaries. Nil refuses everything —
 	// core fails closed until the verify milestone wires the real one.
 	Verifier supervise.Verifier
-	Log      *slog.Logger
+	// GateWeaveURL is the policy endpoint (e.g. the stub's /v1/policy).
+	// Empty runs offline: cached policy only.
+	GateWeaveURL string
+	// PolicyInterval overrides the poll cadence (dev; zero = default).
+	PolicyInterval time.Duration
+	Log            *slog.Logger
 }
 
 // Run starts core and blocks until ctx ends.
@@ -70,12 +78,27 @@ func Run(ctx context.Context, opts Options) error {
 		})
 	}
 
+	st, err := store.Open(lay.StateDir, keyprotect.New())
+	if err != nil {
+		return fmt.Errorf("opening store: %w", err)
+	}
+	defer st.Close()
+
+	policyMgr := &policy.Manager{
+		Log:      log,
+		URL:      opts.GateWeaveURL,
+		Interval: opts.PolicyInterval,
+		Cache:    st,
+	}
+	policyMgr.Load()
+	go policyMgr.Run(ctx)
+
 	identity := hostserv.NewStubIdentity()
 	services := &hostserv.Services{
 		Log:       log,
 		Bus:       eventbus.New(),
-		Store:     hostserv.NewMemStore(),
-		Policy:    hostserv.NewMemPolicy(),
+		Store:     st,
+		Policy:    policyMgr,
 		Identity:  identity,
 		Transport: &hostserv.LogTransport{Log: log},
 	}

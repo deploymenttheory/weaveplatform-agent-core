@@ -19,6 +19,9 @@ import (
 func main() {
 	stateDir := flag.String("state-dir", "", "override the state directory (dev/tests; also WEAVE_STATE_DIR)")
 	modulesDir := flag.String("modules-dir", "", "override the installed-modules directory")
+	gateweaveURL := flag.String("gateweave-url", os.Getenv("WEAVE_GATEWEAVE_URL"),
+		"GateWeave policy endpoint; empty runs offline on cached policy")
+	policyInterval := flag.Duration("policy-interval", 0, "policy poll interval override (dev)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
@@ -33,10 +36,12 @@ func main() {
 	defer stop()
 
 	err := core.Run(ctx, core.Options{
-		StateDir:   *stateDir,
-		ModulesDir: *modulesDir,
-		Verifier:   verify.New(log),
-		Log:        log,
+		StateDir:       *stateDir,
+		ModulesDir:     *modulesDir,
+		Verifier:       verify.New(log),
+		GateWeaveURL:   *gateweaveURL,
+		PolicyInterval: *policyInterval,
+		Log:            log,
 	})
 	if err != nil {
 		log.Error("core failed", "err", err)
