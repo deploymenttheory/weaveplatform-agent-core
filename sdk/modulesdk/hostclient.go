@@ -1,0 +1,360 @@
+package modulesdk
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"strings"
+	"sync"
+	"time"
+
+	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+)
+
+// hostClient implements Host over core's per-module host socket. All auth
+// is per-connection: the one-time token rides every RPC as metadata and
+// core binds the connection to this module's namespace on first use.
+type hostClient struct {
+	conn *grpc.ClientConn
+	log  *slog.Logger
+
+	identity  agentv1.IdentityServiceClient
+	transport agentv1.TransportServiceClient
+	policy    agentv1.PolicyServiceClient
+	store     agentv1.StoreServiceClient
+	events    agentv1.EventBusServiceClient
+
+	mu       sync.Mutex
+	surfaces []Surface
+	jobs     []Job
+	// jobCancel is non-nil while jobs are running (between Start and Stop).
+	jobCancel context.CancelFunc
+	jobCtx    context.Context
+	jobWG     sync.WaitGroup
+	started   bool
+}
+
+func dialHost(network, addr, token string, log *slog.Logger) (*hostClient, error) {
+	withToken := func(ctx context.Context) context.Context {
+		return metadata.AppendToOutgoingContext(ctx, handshake.TokenMetadataKey, token)
+	}
+	conn, err := ipc.GRPCClient(network, addr,
+		grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any,
+			cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			return invoker(withToken(ctx), method, req, reply, cc, opts...)
+		}),
+		grpc.WithStreamInterceptor(func(ctx context.Context, desc *grpc.StreamDesc,
+			cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			return streamer(withToken(ctx), desc, cc, method, opts...)
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("modulesdk: dialing host: %w", err)
+	}
+	return &hostClient{
+		conn:      conn,
+		log:       log,
+		identity:  agentv1.NewIdentityServiceClient(conn),
+		transport: agentv1.NewTransportServiceClient(conn),
+		policy:    agentv1.NewPolicyServiceClient(conn),
+		store:     agentv1.NewStoreServiceClient(conn),
+		events:    agentv1.NewEventBusServiceClient(conn),
+	}, nil
+}
+
+func (h *hostClient) Close() error { return h.conn.Close() }
+
+func (h *hostClient) Log() *slog.Logger { return h.log }
+
+// --- Identity ---
+
+func (h *hostClient) Identity() Identity { return identityClient{h} }
+
+type identityClient struct{ h *hostClient }
+
+func (c identityClient) WhoAmI(ctx context.Context) (DeviceIdentity, error) {
+	resp, err := c.h.identity.WhoAmI(ctx, &agentv1.WhoAmIRequest{})
+	if err != nil {
+		return DeviceIdentity{}, err
+	}
+	return DeviceIdentity{
+		DeviceID:  resp.GetDeviceId(),
+		Ephemeral: resp.GetEphemeral(),
+		Tenant:    resp.GetTenant(),
+	}, nil
+}
+
+func (c identityClient) Credential(ctx context.Context, scopes []string) (Credential, error) {
+	resp, err := c.h.identity.Credential(ctx, &agentv1.CredentialRequest{Scopes: scopes})
+	if err != nil {
+		return Credential{}, err
+	}
+	return Credential{
+		Token:     resp.GetToken(),
+		ExpiresAt: time.Unix(resp.GetExpiresAt(), 0),
+		Scopes:    resp.GetGrantedScopes(),
+	}, nil
+}
+
+// --- Transport ---
+
+func (h *hostClient) Transport() Transport { return transportClient{h} }
+
+type transportClient struct{ h *hostClient }
+
+func (c transportClient) Send(ctx context.Context, msg Message, queueOffline bool) (bool, error) {
+	resp, err := c.h.transport.Send(ctx, &agentv1.TransportSendRequest{
+		Message: &agentv1.TransportMessage{
+			Peer: agentv1.Peer(msg.Peer),
+			Kind: msg.Kind,
+			Data: msg.Data,
+		},
+		QueueOffline: queueOffline,
+	})
+	if err != nil {
+		return false, err
+	}
+	return resp.GetDelivered(), nil
+}
+
+func (c transportClient) Receive(ctx context.Context) (<-chan Message, error) {
+	stream, err := c.h.transport.Receive(ctx, &agentv1.TransportReceiveRequest{})
+	if err != nil {
+		return nil, err
+	}
+	out := make(chan Message)
+	go func() {
+		defer close(out)
+		for {
+			m, err := stream.Recv()
+			if err != nil {
+				return
+			}
+			select {
+			case out <- Message{Peer: Peer(m.GetPeer()), Kind: m.GetKind(), Data: m.GetData()}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out, nil
+}
+
+// --- Policy ---
+
+func (h *hostClient) Policy() PolicyReader { return policyClient{h} }
+
+type policyClient struct{ h *hostClient }
+
+func (c policyClient) Get(ctx context.Context) (PolicyDocument, error) {
+	doc, err := c.h.policy.Get(ctx, &agentv1.PolicyGetRequest{})
+	if err != nil {
+		return PolicyDocument{}, err
+	}
+	return PolicyDocument{Revision: doc.GetRevision(), Data: doc.GetData()}, nil
+}
+
+func (c policyClient) Watch(ctx context.Context) (<-chan PolicyDocument, error) {
+	stream, err := c.h.policy.Watch(ctx, &agentv1.PolicyWatchRequest{})
+	if err != nil {
+		return nil, err
+	}
+	out := make(chan PolicyDocument)
+	go func() {
+		defer close(out)
+		for {
+			doc, err := stream.Recv()
+			if err != nil {
+				return
+			}
+			select {
+			case out <- PolicyDocument{Revision: doc.GetRevision(), Data: doc.GetData()}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out, nil
+}
+
+// --- Store ---
+
+func (h *hostClient) Store(ns string) Store {
+	prefix := ""
+	if ns != "" {
+		prefix = ns + "/"
+	}
+	return storeClient{h: h, prefix: prefix}
+}
+
+type storeClient struct {
+	h      *hostClient
+	prefix string
+}
+
+func (c storeClient) Get(ctx context.Context, key string) ([]byte, bool, error) {
+	resp, err := c.h.store.Get(ctx, &agentv1.StoreGetRequest{Key: c.prefix + key})
+	if err != nil {
+		return nil, false, err
+	}
+	return resp.GetValue(), resp.GetFound(), nil
+}
+
+func (c storeClient) Put(ctx context.Context, key string, value []byte) error {
+	_, err := c.h.store.Put(ctx, &agentv1.StorePutRequest{Key: c.prefix + key, Value: value})
+	return err
+}
+
+func (c storeClient) Delete(ctx context.Context, key string) error {
+	_, err := c.h.store.Delete(ctx, &agentv1.StoreDeleteRequest{Key: c.prefix + key})
+	return err
+}
+
+func (c storeClient) List(ctx context.Context, prefix string) ([]string, error) {
+	resp, err := c.h.store.List(ctx, &agentv1.StoreListRequest{Prefix: c.prefix + prefix})
+	if err != nil {
+		return nil, err
+	}
+	keys := resp.GetKeys()
+	if c.prefix != "" {
+		trimmed := make([]string, 0, len(keys))
+		for _, k := range keys {
+			trimmed = append(trimmed, strings.TrimPrefix(k, c.prefix))
+		}
+		keys = trimmed
+	}
+	return keys, nil
+}
+
+// --- Events ---
+
+func (h *hostClient) Events() Events { return eventsClient{h} }
+
+type eventsClient struct{ h *hostClient }
+
+func (c eventsClient) Publish(ctx context.Context, topic string, data []byte) error {
+	_, err := c.h.events.Publish(ctx, &agentv1.PublishRequest{Topic: topic, Data: data})
+	return err
+}
+
+func (c eventsClient) Subscribe(ctx context.Context, topics ...string) (<-chan Event, error) {
+	stream, err := c.h.events.Subscribe(ctx, &agentv1.SubscribeRequest{Topics: topics})
+	if err != nil {
+		return nil, err
+	}
+	out := make(chan Event)
+	go func() {
+		defer close(out)
+		for {
+			ev, err := stream.Recv()
+			if err != nil {
+				return
+			}
+			select {
+			case out <- Event{
+				Topic:       ev.GetTopic(),
+				Data:        ev.GetData(),
+				PublishedAt: time.UnixMilli(ev.GetPublishedAtMs()),
+			}:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out, nil
+}
+
+// --- UI ---
+
+func (h *hostClient) UI() UIBroker { return uiBroker{h} }
+
+type uiBroker struct{ h *hostClient }
+
+func (b uiBroker) Declare(surfaces ...Surface) error {
+	b.h.mu.Lock()
+	defer b.h.mu.Unlock()
+	if b.h.started {
+		return fmt.Errorf("modulesdk: declaring surfaces after Init is not supported at protocol 1")
+	}
+	b.h.surfaces = append(b.h.surfaces, surfaces...)
+	return nil
+}
+
+// declaredSurfaces returns surfaces recorded during Init, for the Init
+// response.
+func (h *hostClient) declaredSurfaces() []*agentv1.Surface {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	out := make([]*agentv1.Surface, 0, len(h.surfaces))
+	for _, s := range h.surfaces {
+		out = append(out, &agentv1.Surface{Id: s.ID, Title: s.Title, Kind: s.Kind, Data: s.Data})
+	}
+	return out
+}
+
+// --- Schedule ---
+
+func (h *hostClient) Schedule(j Job) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.jobs = append(h.jobs, j)
+	if h.jobCancel != nil {
+		// Already started: run the new job immediately.
+		h.launchJobLocked(j)
+	}
+}
+
+// startJobs begins all registered jobs. Called by the runtime on Start.
+func (h *hostClient) startJobs(parent context.Context) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.jobCancel != nil {
+		return
+	}
+	ctx, cancel := context.WithCancel(parent)
+	h.jobCancel = cancel
+	h.started = true
+	h.jobCtx = ctx
+	for _, j := range h.jobs {
+		h.launchJobLocked(j)
+	}
+}
+
+func (h *hostClient) launchJobLocked(j Job) {
+	ctx := h.jobCtx
+	h.jobWG.Add(1)
+	go func() {
+		defer h.jobWG.Done()
+		j.Run(ctx)
+		if j.Every <= 0 {
+			return
+		}
+		t := time.NewTicker(j.Every)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				j.Run(ctx)
+			}
+		}
+	}()
+}
+
+// stopJobs cancels all jobs and waits for them. Called by the runtime on
+// Stop and Shutdown.
+func (h *hostClient) stopJobs() {
+	h.mu.Lock()
+	cancel := h.jobCancel
+	h.jobCancel = nil
+	h.mu.Unlock()
+	if cancel != nil {
+		cancel()
+		h.jobWG.Wait()
+	}
+}

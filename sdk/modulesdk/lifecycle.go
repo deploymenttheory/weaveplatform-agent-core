@@ -1,0 +1,146 @@
+package modulesdk
+
+import (
+	"context"
+	"sync"
+	"time"
+
+	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+// moduleState is the enforced lifecycle sequence. Init exactly once before
+// Start; Stop is idempotent; Shutdown ends the process.
+type moduleState int
+
+const (
+	stateCreated moduleState = iota
+	stateInited
+	stateStarted
+	stateStopped
+)
+
+// moduleServer adapts the Module interface onto ModuleService. Core is the
+// only client.
+type moduleServer struct {
+	agentv1.UnimplementedModuleServiceServer
+
+	m    Module
+	host *hostClient
+	// dialHost is deferred to Init so a module that never gets Init'd
+	// never dials.
+	connectHost func() (*hostClient, error)
+	// shutdown asks Serve to exit; buffered so Shutdown never blocks.
+	shutdown chan struct{}
+	// healthInterval passed back to core in InitResponse.
+	healthInterval uint32
+
+	mu    sync.Mutex
+	state moduleState
+}
+
+func (s *moduleServer) Init(ctx context.Context, req *agentv1.InitRequest) (*agentv1.InitResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state != stateCreated {
+		return nil, status.Error(codes.FailedPrecondition, "Init called twice")
+	}
+	if got, want := req.GetModuleId(), s.m.ID(); got != want {
+		// Core thinks it launched a different module than this binary
+		// believes it is. Refuse: this is the tamper tell.
+		return nil, status.Errorf(codes.FailedPrecondition, "module identity mismatch: core says %q, binary is %q", got, want)
+	}
+	if req.GetProtocol() != Protocol {
+		return nil, status.Errorf(codes.FailedPrecondition, "protocol mismatch: negotiated %d, built for %d", req.GetProtocol(), Protocol)
+	}
+
+	host, err := s.connectHost()
+	if err != nil {
+		return nil, status.Errorf(codes.Unavailable, "connecting host services: %v", err)
+	}
+	s.host = host
+
+	if err := s.m.Init(ctx, host); err != nil {
+		host.Close()
+		s.host = nil
+		return nil, status.Errorf(codes.Internal, "module init: %v", err)
+	}
+	s.state = stateInited
+
+	requires := s.m.Requires()
+	reqCaps := make([]*agentv1.Capability, 0, len(requires))
+	for _, c := range requires {
+		reqCaps = append(reqCaps, &agentv1.Capability{Name: string(c)})
+	}
+	return &agentv1.InitResponse{
+		Requires:              reqCaps,
+		Surfaces:              host.declaredSurfaces(),
+		HealthIntervalSeconds: s.healthInterval,
+	}, nil
+}
+
+func (s *moduleServer) Start(ctx context.Context, _ *agentv1.StartRequest) (*agentv1.StartResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.state != stateInited {
+		return nil, status.Errorf(codes.FailedPrecondition, "Start in state %d", s.state)
+	}
+	if err := s.m.Start(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "module start: %v", err)
+	}
+	// Jobs outlive the RPC: they run on the runtime's context, not the
+	// call's.
+	s.host.startJobs(context.Background())
+	s.state = stateStarted
+	return &agentv1.StartResponse{}, nil
+}
+
+func (s *moduleServer) Stop(ctx context.Context, req *agentv1.StopRequest) (*agentv1.StopResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.stopLocked(ctx, req.GetDeadlineSeconds())
+}
+
+func (s *moduleServer) stopLocked(ctx context.Context, deadlineSeconds uint32) (*agentv1.StopResponse, error) {
+	switch s.state {
+	case stateStopped, stateCreated, stateInited:
+		// Idempotent; stopping something never started is a no-op.
+		s.state = stateStopped
+		return &agentv1.StopResponse{}, nil
+	}
+	if deadlineSeconds > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(deadlineSeconds)*time.Second)
+		defer cancel()
+	}
+	s.host.stopJobs()
+	if err := s.m.Stop(ctx); err != nil {
+		return nil, status.Errorf(codes.Internal, "module stop: %v", err)
+	}
+	s.state = stateStopped
+	return &agentv1.StopResponse{}, nil
+}
+
+func (s *moduleServer) Health(ctx context.Context, _ *agentv1.HealthRequest) (*agentv1.HealthResponse, error) {
+	h := s.m.Health()
+	return &agentv1.HealthResponse{Health: &agentv1.Health{
+		Status:  agentv1.Health_Status(h.Status),
+		Reason:  h.Reason,
+		Details: h.Details,
+	}}, nil
+}
+
+func (s *moduleServer) Shutdown(ctx context.Context, _ *agentv1.ShutdownRequest) (*agentv1.ShutdownResponse, error) {
+	s.mu.Lock()
+	if _, err := s.stopLocked(ctx, 0); err != nil {
+		s.mu.Unlock()
+		return nil, err
+	}
+	s.mu.Unlock()
+	select {
+	case s.shutdown <- struct{}{}:
+	default:
+	}
+	return &agentv1.ShutdownResponse{}, nil
+}

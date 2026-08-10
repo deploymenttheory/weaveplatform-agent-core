@@ -1,0 +1,176 @@
+package modulesdk
+
+import (
+	"context"
+	"log/slog"
+	"time"
+)
+
+// Protocol is the protocol integer modules built with this SDK release
+// speak. It moves only when the wire contract does (see
+// weaveplatform-api/PROTOCOL.md).
+const Protocol uint32 = 1
+
+// Capability names one probed fact about the host, e.g. "platform.osinfo".
+// The vocabulary is owned by the protocol, not by modules.
+type Capability string
+
+// HealthStatus is a module's self-reported condition.
+type HealthStatus int
+
+const (
+	HealthUnknown HealthStatus = iota
+	HealthHealthy
+	// HealthDegraded is first-class: the module is up but a backend it
+	// needs is temporarily absent. The supervisor restarts Unhealthy
+	// modules, not Degraded ones.
+	HealthDegraded
+	HealthUnhealthy
+)
+
+// Health is what Module.Health returns.
+type Health struct {
+	Status  HealthStatus
+	Reason  string
+	Details map[string]string
+}
+
+// Module is what every product's device-side half implements. See spec §5.
+type Module interface {
+	ID() string
+	Requires() []Capability
+	Init(context.Context, Host) error
+	Start(context.Context) error
+	Stop(context.Context) error
+	Health() Health
+}
+
+// Host is what core offers a module. It is closed by default: growing this
+// interface is an architecture decision, not a pull request.
+type Host interface {
+	Identity() Identity
+	Transport() Transport
+	Policy() PolicyReader
+	// Store returns the module's namespaced store. ns partitions within
+	// the module's own namespace ("" for the root); a module can never
+	// reach another module's namespace, whatever it passes.
+	Store(ns string) Store
+	Events() Events
+	UI() UIBroker
+	// Schedule registers a recurring job. Jobs run after Start and stop
+	// with the module.
+	Schedule(Job)
+	Log() *slog.Logger
+}
+
+// Identity answers who this device is. Modules never see private keys.
+type Identity interface {
+	WhoAmI(ctx context.Context) (DeviceIdentity, error)
+	// Credential mints a token scoped to this module.
+	Credential(ctx context.Context, scopes []string) (Credential, error)
+}
+
+// DeviceIdentity mirrors the platform's view of the device.
+type DeviceIdentity struct {
+	DeviceID  string
+	Ephemeral bool
+	Tenant    string
+}
+
+// Credential is a module-scoped bearer token.
+type Credential struct {
+	Token     string
+	ExpiresAt time.Time
+	Scopes    []string
+}
+
+// Peer names which channel a transport message travels on.
+type Peer int
+
+const (
+	PeerGateWeave Peer = iota + 1
+	PeerHypervisor
+)
+
+// Message is one platform message, sent or received via core's transport.
+type Message struct {
+	Peer Peer
+	Kind string
+	Data []byte
+}
+
+// Transport sends and receives through core's authenticated channels.
+// Modules never open their own sockets.
+type Transport interface {
+	// Send hands msg to core. With queueOffline, an unreachable peer
+	// queues the message instead of failing; delivered reports which
+	// happened.
+	Send(ctx context.Context, msg Message, queueOffline bool) (delivered bool, err error)
+	// Receive delivers inbound messages addressed to this module until
+	// ctx ends. The channel closes on ctx cancellation or stream failure.
+	Receive(ctx context.Context) (<-chan Message, error)
+}
+
+// PolicyDocument is the module-scoped policy payload as delivered by core.
+type PolicyDocument struct {
+	Revision uint64
+	Data     []byte
+}
+
+// PolicyReader reads and watches this module's policy. Host-delivered
+// policy is authoritative over anything local.
+type PolicyReader interface {
+	Get(ctx context.Context) (PolicyDocument, error)
+	// Watch yields the current document immediately, then again on every
+	// change. The channel closes on ctx cancellation or stream failure.
+	Watch(ctx context.Context) (<-chan PolicyDocument, error)
+}
+
+// Store is the module's encrypted, namespaced key/value store.
+type Store interface {
+	Get(ctx context.Context, key string) (value []byte, found bool, err error)
+	Put(ctx context.Context, key string, value []byte) error
+	Delete(ctx context.Context, key string) error
+	List(ctx context.Context, prefix string) ([]string, error)
+}
+
+// Event is one bus event. Topic arrives prefixed with the publisher's
+// module id, stamped by core — subscribers can trust the origin.
+type Event struct {
+	Topic       string
+	Data        []byte
+	PublishedAt time.Time
+}
+
+// Events is the inter-module bus. Modules do not import each other; this
+// is the only lateral channel.
+type Events interface {
+	// Publish emits on topic; core prefixes it with this module's id.
+	Publish(ctx context.Context, topic string, data []byte) error
+	// Subscribe delivers matching events until ctx ends. Patterns are
+	// exact topics or prefix globs like "sysinfo.*".
+	Subscribe(ctx context.Context, topics ...string) (<-chan Event, error)
+}
+
+// Surface is UI declared as data. Modules never draw; the portal renders.
+type Surface struct {
+	ID    string
+	Title string
+	Kind  string
+	Data  []byte
+}
+
+// UIBroker collects the module's declared surfaces. At protocol 1,
+// surfaces are declared during Init and carried in the Init response;
+// declaring later is not yet supported.
+type UIBroker interface {
+	Declare(surfaces ...Surface) error
+}
+
+// Job is a recurring unit of work. Run is invoked once immediately after
+// Start, then every Every, until the module stops. Runs do not overlap.
+type Job struct {
+	Name  string
+	Every time.Duration
+	Run   func(context.Context)
+}
