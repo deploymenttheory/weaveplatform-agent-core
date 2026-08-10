@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -59,6 +60,100 @@ func install(t *testing.T, coreDir, version, bin string) {
 	if err := os.WriteFile(filepath.Join(dst, binaryName()), data, 0o755); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// buildSignalCore builds a fake core that writes its WEAVE_READY_FILE on
+// start (the readiness signal) and, on SIGTERM, writes a "graceful" marker
+// before exiting 0 — so the test can prove weaveboot terminates core
+// gracefully (SIGTERM), not with an abrupt kill.
+func buildSignalCore(t *testing.T, dir string) string {
+	t.Helper()
+	src := filepath.Join(dir, "signalcore.go")
+	code := `package main
+
+import (
+	"os"
+	"os/signal"
+	"syscall"
+)
+
+func main() {
+	if p := os.Getenv("WEAVE_READY_FILE"); p != "" {
+		os.WriteFile(p, []byte("1.0.0\n"), 0o600)
+	}
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGTERM, os.Interrupt)
+	<-ch
+	if p := os.Getenv("WEAVE_GRACE_FILE"); p != "" {
+		os.WriteFile(p, []byte("graceful\n"), 0o600)
+	}
+}
+`
+	if err := os.WriteFile(src, []byte(code), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bin := filepath.Join(dir, "signalcore")
+	cmd := exec.Command("go", "build", "-o", bin, src)
+	cmd.Env = append(cmd.Environ(), "CGO_ENABLED=0")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("build signalcore: %v\n%s", err, out)
+	}
+	return bin
+}
+
+// TestWeavebootStopsCoreGracefully proves weaveboot terminates core with
+// SIGTERM (its shutdown path), not SIGKILL, when its own context is
+// cancelled — and that core's readiness marker is observed on the way up.
+func TestWeavebootStopsCoreGracefully(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGTERM graceful stop is a unix concern; Windows uses Kill")
+	}
+	work := t.TempDir()
+	core := buildSignalCore(t, work)
+	coreDir := filepath.Join(work, "core")
+	install(t, coreDir, "1.0.0", core)
+	writeStr(filepath.Join(coreDir, "current"), "1.0.0")
+
+	graceFile := filepath.Join(work, "grace")
+	t.Setenv("WEAVE_GRACE_FILE", graceFile) // inherited by core via runOnce
+
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- Run(ctx, Options{
+			Log: log, CoreDir: coreDir, StableAfter: time.Hour,
+			VerifyCore: func(string) error { return nil },
+		})
+	}()
+
+	// Wait for core to come up (its readiness marker appears).
+	readyFile := filepath.Join(coreDir, "ready")
+	if !waitForFile(t, readyFile, 30*time.Second) {
+		cancel()
+		t.Fatal("core never wrote its readiness marker")
+	}
+
+	// Cancel weaveboot: it must SIGTERM core, which writes the grace marker.
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("weaveboot returned error: %v", err)
+	}
+	if _, err := os.Stat(graceFile); err != nil {
+		t.Fatalf("core was not stopped gracefully (no SIGTERM handler ran): %v", err)
+	}
+}
+
+func waitForFile(t *testing.T, path string, timeout time.Duration) bool {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return false
 }
 
 func TestStagedPromoteAndCrashLoopRevert(t *testing.T) {
