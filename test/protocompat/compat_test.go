@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -23,6 +24,10 @@ import (
 func buildFixture(t *testing.T) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "compat-v1")
+	if runtime.GOOS == "windows" {
+		// Windows cannot exec a binary without its extension.
+		bin += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", bin, ".")
 	cmd.Dir = "v1"
 	cmd.Env = append(cmd.Environ(), "CGO_ENABLED=0", "GOWORK=off", "GOFLAGS=-mod=mod")

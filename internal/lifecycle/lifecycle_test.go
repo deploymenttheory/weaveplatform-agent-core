@@ -30,7 +30,7 @@ func makeInstallDir(t *testing.T, bin, version string, crashMS int) string {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(bin) //nolint:errcheck
-	if err := os.WriteFile(filepath.Join(dir, "testmod"), data, 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "testmod"+exeSuffix()), data, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	m := manifest.Manifest{
@@ -57,9 +57,17 @@ func jsonInt(v int) string {
 	return string(b)
 }
 
+// exeSuffix: Windows cannot exec a binary without its extension.
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
+}
+
 func TestInstallHotSwapAndAutoRollback(t *testing.T) {
 	// Build the module once.
-	bin := filepath.Join(t.TempDir(), "testmod")
+	bin := filepath.Join(t.TempDir(), "testmod"+exeSuffix())
 	build := exec.Command("go", "build", "-o", bin, "../supervise/testdata/testmodule")
 	build.Env = append(build.Environ(), "CGO_ENABLED=0")
 	if out, err := build.CombinedOutput(); err != nil {

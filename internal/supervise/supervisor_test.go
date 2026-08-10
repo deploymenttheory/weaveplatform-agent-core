@@ -22,13 +22,21 @@ import (
 
 func buildTestModule(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "testmod")
+	bin := filepath.Join(t.TempDir(), "testmod"+exeSuffix())
 	cmd := exec.Command("go", "build", "-o", bin, "./testdata/testmodule")
 	cmd.Env = append(cmd.Environ(), "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("building test module: %v\n%s", err, out)
 	}
 	return bin
+}
+
+// exeSuffix: Windows cannot exec a binary without its extension.
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
 }
 
 func testManifest(caps ...string) *manifest.Manifest {
