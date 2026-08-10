@@ -49,6 +49,11 @@ type Mux struct {
 	seeded  bool
 	flushMu sync.Mutex // serializes flush so concurrent sends don't double-deliver
 	dropped uint64
+
+	subMu sync.Mutex // guards subs
+	// subs maps a module id to its live Receive channels; the hypervisor
+	// read loop fans inbound messages out through deliver.
+	subs map[string][]chan *agentv1.TransportMessage
 }
 
 const defaultMaxQueued = 10000
@@ -105,15 +110,61 @@ func (m *Mux) Send(
 	return false, nil
 }
 
-// Receive implements hostserv.TransportBackend. Inbound routing arrives
-// with the hypervisor channel; today the stream stays open and silent.
+// Receive implements hostserv.TransportBackend. It registers a subscriber for
+// the module's inbound messages and delivers whatever the hypervisor peer's
+// read loop routes to that module (via deliver), until ctx ends. Multiple
+// concurrent Receive streams for one module are allowed; each gets a copy.
 func (m *Mux) Receive(ctx context.Context, module string) <-chan *agentv1.TransportMessage {
-	ch := make(chan *agentv1.TransportMessage)
+	ch := make(chan *agentv1.TransportMessage, inboundBuffer)
+	m.subMu.Lock()
+	if m.subs == nil {
+		m.subs = make(map[string][]chan *agentv1.TransportMessage)
+	}
+	m.subs[module] = append(m.subs[module], ch)
+	m.subMu.Unlock()
+
 	go func() {
 		<-ctx.Done()
+		m.subMu.Lock()
+		subs := m.subs[module]
+		for i, c := range subs {
+			if c == ch {
+				m.subs[module] = append(subs[:i], subs[i+1:]...)
+				break
+			}
+		}
+		m.subMu.Unlock()
 		close(ch)
 	}()
 	return ch
+}
+
+// inboundBuffer bounds each subscriber's queue; a consumer slower than this
+// drops messages (logged) rather than stalling the single hypervisor read
+// loop, which must never block.
+const inboundBuffer = 64
+
+// deliver fans an inbound hypervisor message out to every Receive stream for
+// the addressed module. Called from the hypervisor peer's read loop. A slow
+// or absent subscriber does not block the loop: the send is non-blocking and a
+// full/missing channel drops the message with a warning.
+func (m *Mux) deliver(module, kind string, data []byte) {
+	m.subMu.Lock()
+	subs := append([]chan *agentv1.TransportMessage(nil), m.subs[module]...)
+	m.subMu.Unlock()
+	if len(subs) == 0 {
+		m.Log.Warn("inbound hypervisor message for module with no receiver; dropped",
+			"module", module, "kind", kind)
+		return
+	}
+	msg := &agentv1.TransportMessage{Peer: agentv1.Peer_PEER_HYPERVISOR, Kind: kind, Data: data}
+	for _, ch := range subs {
+		select {
+		case ch <- msg:
+		default:
+			m.Log.Warn("inbound hypervisor receiver slow; message dropped", "module", module, "kind", kind)
+		}
+	}
 }
 
 func (m *Mux) peerFor(peer agentv1.Peer) Peer {
