@@ -6,6 +6,24 @@ import (
 	"fmt"
 )
 
+// Signing contexts provide domain separation: an endorsement signature and
+// a manifest signature are over different message spaces, so a signature
+// obtained in one role can never be replayed in the other. The signed
+// message is Context + "\x00" + fileBytes.
+const (
+	EndorseContext  = "weave-endorse-v1"
+	ManifestContext = "weave-manifest-v1"
+)
+
+// SigningMessage prepends the domain-separation context to the file bytes.
+// Both signer and verifier must use the same context for a given role.
+func SigningMessage(context string, data []byte) []byte {
+	msg := make([]byte, 0, len(context)+1+len(data))
+	msg = append(msg, context...)
+	msg = append(msg, 0)
+	return append(msg, data...)
+}
+
 // The signing chain is two-tier, minisign-shaped: an offline root key
 // endorses named signing keys; signing keys sign channel manifests. All
 // signatures are detached Ed25519 over the exact file bytes, stored

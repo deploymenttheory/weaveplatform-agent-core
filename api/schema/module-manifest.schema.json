@@ -53,6 +53,11 @@
       "items": { "type": "string", "pattern": "^[a-z][a-z0-9.-]*$" },
       "description": "Capability names the module requires; core gates launch on these."
     },
+    "subscribes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Event-bus topic patterns this module may subscribe to (exact or \"<prefix>.*\"). Core enforces this allow-list at Subscribe; empty means the module subscribes to nothing."
+    },
     "signing": {
       "type": "object",
       "additionalProperties": false,

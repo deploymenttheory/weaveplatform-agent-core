@@ -56,8 +56,13 @@ type Manifest struct {
 	Session      string     `json:"session"`
 	Platforms    []Platform `json:"platforms"`
 	Capabilities []string   `json:"capabilities,omitempty"`
-	Signing      *Signing   `json:"signing,omitempty"`
-	Artifacts    []Artifact `json:"artifacts,omitempty"`
+	// Subscribes lists the event-bus topic patterns this module may
+	// subscribe to (exact topics or "<prefix>.*" globs). Core enforces it
+	// at Subscribe, so a module cannot firehose another's events. Empty
+	// means the module subscribes to nothing.
+	Subscribes []string   `json:"subscribes,omitempty"`
+	Signing    *Signing   `json:"signing,omitempty"`
+	Artifacts  []Artifact `json:"artifacts,omitempty"`
 }
 
 var (
