@@ -10,7 +10,10 @@ signed binaries, owned by product teams, shipped on their products' release trai
 promoted at runtime. Core launches them Terraform-style: verify signature, spawn, handshake,
 speak gRPC over a local socket for the process lifetime.
 
-The full architecture lives in [`spec.md`](spec.md). Read it before changing anything here.
+The full architecture lives in [`spec.md`](spec.md) — read it before changing anything
+here. [`docs/architecture.md`](docs/architecture.md) shows what was built and how the pieces
+relate (with diagrams); [`docs/development.md`](docs/development.md) covers local setup,
+running the agent, and the release pipeline.
 
 ## Repos
 
