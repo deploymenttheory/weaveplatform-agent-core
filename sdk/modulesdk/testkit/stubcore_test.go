@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -15,13 +16,21 @@ import (
 // buildToy builds the toy module once per test binary run.
 func buildToy(t *testing.T) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "toymodule")
+	bin := filepath.Join(t.TempDir(), "toymodule"+exeSuffix())
 	cmd := exec.Command("go", "build", "-o", bin, "./testdata/toymodule")
 	cmd.Env = append(cmd.Environ(), "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("building toy module: %v\n%s", err, out)
 	}
 	return bin
+}
+
+// exeSuffix: Windows cannot exec a binary without its extension.
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
 }
 
 func TestHandshakeAndLifecycle(t *testing.T) {
