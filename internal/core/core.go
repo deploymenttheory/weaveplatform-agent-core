@@ -140,6 +140,17 @@ func Run(ctx context.Context, opts Options) error {
 			},
 		}
 	}
+	// When running inside a Weave-enabled guest, the hypervisor channel is a
+	// second peer (the attested one). Core owns the single connection; guest
+	// modules address PEER_HYPERVISOR and never touch the wire. Runs for the
+	// core lifetime.
+	if attrs, ok := caps["hypervisor.channel"]; ok {
+		if err := mux.ConnectHypervisor(ctx, attrs); err != nil {
+			log.Warn("hypervisor channel present but could not connect", "err", err)
+		} else {
+			log.Info("hypervisor channel connected", "device", attrs["device"])
+		}
+	}
 
 	services := &hostserv.Services{
 		Log:       log,

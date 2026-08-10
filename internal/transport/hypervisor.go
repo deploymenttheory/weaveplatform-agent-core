@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"sync"
+
+	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 )
 
 // The hypervisor channel is a single byte pipe (virtio-serial / vsock /
@@ -45,8 +47,24 @@ type HypervisorPeer struct {
 	w    *bufio.Writer
 }
 
+// ConnectHypervisor opens the probed hypervisor device and wires it as the
+// PEER_HYPERVISOR peer, starting the single read loop on ctx. Call once at
+// startup when the hypervisor.channel capability is present. attrs is that
+// capability's probe attribute map (device path etc.).
+func (m *Mux) ConnectHypervisor(ctx context.Context, attrs map[string]string) error {
+	rwc, err := openDevice(attrs)
+	if err != nil {
+		return fmt.Errorf("transport: opening hypervisor channel: %w", err)
+	}
+	m.Hypervisor = newHypervisorPeer(ctx, rwc, m.Log, m.deliver)
+	// Drain anything queued while the channel was down.
+	m.Flush(agentv1.Peer_PEER_HYPERVISOR)
+	return nil
+}
+
 // newHypervisorPeer wraps an already-open connection and starts the single
-// read loop. Exposed for the loopback test; production uses NewHypervisorPeer.
+// read loop. Exposed for the loopback test; production goes via
+// Mux.ConnectHypervisor.
 func newHypervisorPeer(ctx context.Context, rwc io.ReadWriteCloser, log *slog.Logger, deliver func(module, kind string, data []byte)) *HypervisorPeer {
 	p := &HypervisorPeer{
 		log:     log,
