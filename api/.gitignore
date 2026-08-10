@@ -48,3 +48,6 @@ __pycache__/
 *.exe
 *.dylib
 *.so
+# lint/CI artifacts (never commit)
+*.sarif
+golangci-lint-report.sarif

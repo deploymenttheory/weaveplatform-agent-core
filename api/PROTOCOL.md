@@ -5,9 +5,10 @@ protocol integer** between them. This document owns the integer.
 
 ## What the integer is
 
-The protocol is the complete contract a module builds against: the proto package
-`weave/agent/v1`, the handshake environment and stdout line, the capability vocabulary, and the
-`go-bindings-*` versions its participants build against. Proto package `v<N>` **is** protocol N.
+The protocol is the wire contract a module builds against: the proto package `weave/agent/v1`,
+the handshake environment and stdout line, and the capability vocabulary. Proto package `v<N>`
+**is** protocol N. (The `go-bindings-*` versions are pinned separately, in the channel
+manifest — see Bindings pinning below.)
 
 Core advertises `{min, max}` at spawn (`WEAVE_PROTOCOL_MIN`, `WEAVE_PROTOCOL_MAX`). Each module
 declares the single protocol it speaks. Compatibility is negotiated at handshake, never
@@ -40,8 +41,10 @@ A protocol bump is rare and deliberate — a design review, not a side effect. B
 
 - a wire-visible message or RPC changes incompatibly (buf breaking-change checks gate this);
 - the handshake environment or stdout line changes shape;
-- the capability vocabulary changes meaning (adding a new capability name is *not* a bump);
-- a pinned `go-bindings-*` version moves to a release with changed behaviour.
+- the capability vocabulary changes meaning (adding a new capability name is *not* a bump).
+
+A `go-bindings-*` version change is **not** a protocol bump — it is a channel event (see
+Bindings pinning).
 
 A bump means a new proto package (`weave/agent/v2`) beside the old one. Core serves both for
 the length of the window. The old package is deleted only when it falls out of the window.
@@ -74,7 +77,7 @@ breaking change lands, at which point `test/protocompat/v2` is added beside `v1`
 
 ```
 core → module    env: WEAVE_PROTOCOL_MIN, WEAVE_PROTOCOL_MAX, WEAVE_HANDSHAKE_TOKEN,
-                      WEAVE_HOST_ADDR, WEAVE_SOCKET_DIR, WEAVE_CONFIG (path, 0600)
+                      WEAVE_HOST_ADDR, WEAVE_SOCKET_DIR
 module → core    stdout, one line:  WEAVE|1|<protocol>|<network>|<addr>
 core → module    gRPC ModuleService.Init on <addr>
 module → core    gRPC dial WEAVE_HOST_ADDR presenting the one-time token
