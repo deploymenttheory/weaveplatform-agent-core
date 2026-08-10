@@ -216,7 +216,7 @@ func (p *ModuleProc) WaitExit(ctx context.Context) error {
 	done := make(chan error, 1)
 	go func() { done <- p.cmd.Wait() }()
 	defer func() {
-		p.conn.Close()           //nolint:errcheck
+		p.conn.Close() //nolint:errcheck
 		p.hostServer.GracefulStop()
 	}()
 	select {
