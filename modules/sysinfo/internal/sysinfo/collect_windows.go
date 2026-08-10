@@ -4,6 +4,8 @@ import (
 	"runtime"
 	"unsafe"
 
+	"github.com/deploymenttheory/go-bindings-wmi/bindings/cim/cimv2"
+	"github.com/deploymenttheory/go-bindings-wmi/runtime/wmi"
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
@@ -32,8 +34,23 @@ func collectOS(inv *Inventory) {
 		}
 		k.Close()
 	}
-	// Serial number needs WMI (Win32_BIOS.SerialNumber); lands with the
-	// go-bindings-wmi integration.
+	collectWMI(inv)
+}
+
+// collectWMI fills the fields only WMI serves. Connect/use/close stays on
+// one goroutine: the WMI Service is COM-thread-pinned.
+func collectWMI(inv *Inventory) {
+	svc, err := wmi.Connect(`root\cimv2`)
+	if err != nil {
+		return
+	}
+	defer svc.Close()
+	if bios, err := cimv2.QueryOneWin32BIOS(svc, ""); err == nil && bios != nil {
+		inv.SerialNumber = bios.SerialNumber
+	}
+	if cs, err := cimv2.QueryOneWin32ComputerSystem(svc, ""); err == nil && cs != nil && cs.Model != "" {
+		inv.HardwareModel = cs.Model
+	}
 }
 
 type memoryStatusEx struct {
