@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/deploymenttheory/weaveplatform-api/manifest"
+	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
 )
 
 // jobHandle is Windows-only containment; a no-op here. Unix containment is
@@ -113,6 +114,26 @@ func prepareSocketDir(dir, hostAddr string, m *manifest.Manifest) error {
 		return fmt.Errorf("chown host socket: %w", err)
 	}
 	return nil
+}
+
+// authorizeModulePeer authorizes connections to a module's host socket by
+// peer uid: root, core's own uid, or the module's dropped uid. This is the
+// real defence the env token only imitated — a same-uid neighbour can read
+// the token from /proc but cannot present a different uid to the kernel.
+func authorizeModulePeer(m *manifest.Manifest) ipc.Authorizer {
+	allowed := map[uint32]bool{0: true, uint32(os.Getuid()): true}
+	if uid, _, ok, err := dropCreds(m); err == nil && ok {
+		allowed[uid] = true
+	}
+	return func(p ipc.PeerCred) error {
+		if !p.HasUID {
+			return nil // can't determine on this platform; dir perms gate
+		}
+		if allowed[p.UID] {
+			return nil
+		}
+		return fmt.Errorf("peer uid %d not authorized for module %s", p.UID, m.ID)
+	}
 }
 
 func postSpawn(cmd *exec.Cmd) (jobHandle, error) {

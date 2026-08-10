@@ -38,9 +38,13 @@ type Server struct {
 	grpcServer *grpc.Server
 }
 
-// Serve listens on addr until ctx ends.
+// Serve listens on addr until ctx ends. The control socket carries no
+// token: access is by OS peer credentials — only root/SYSTEM or core's own
+// user may drive install/rollback. (Previously any local process that
+// could open the socket could; on Windows the default pipe ACL made that
+// "everyone".)
 func (s *Server) Serve(ctx context.Context, addr string) error {
-	lis, err := ipc.Listen(addr)
+	lis, err := ipc.ListenAuthorized(addr, controlAuthorizer())
 	if err != nil {
 		return err
 	}

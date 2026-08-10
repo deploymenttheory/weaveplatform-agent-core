@@ -11,6 +11,7 @@ import (
 	winsec "github.com/deploymenttheory/go-bindings-win32/bindings/win32/security"
 	"github.com/deploymenttheory/go-bindings-win32/bindings/win32/system/threading"
 	"github.com/deploymenttheory/weaveplatform-api/manifest"
+	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
 	"golang.org/x/sys/windows"
 )
 
@@ -62,6 +63,13 @@ func applyPrivilege(cmd *exec.Cmd, m *manifest.Manifest) (cleanup func(), err er
 	default:
 		return cleanup, fmt.Errorf("privilege %q needs per-user session support, not yet implemented", m.Privilege)
 	}
+}
+
+// authorizeModulePeer on Windows is allow-all: named-pipe access is gated
+// by the pipe SDDL (S11), and peer uid is not available via the net.Conn
+// here. See WINDOWS_HANDOFF.md for the GetNamedPipeClientProcessId path.
+func authorizeModulePeer(_ *manifest.Manifest) ipc.Authorizer {
+	return func(ipc.PeerCred) error { return nil }
 }
 
 func postSpawn(cmd *exec.Cmd) (jobHandle, error) {

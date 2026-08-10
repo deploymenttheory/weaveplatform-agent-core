@@ -70,7 +70,7 @@ func (r *runner) launch(ctx context.Context) (*proc, error) {
 	if runtime.GOOS == "windows" {
 		hostAddr = `\\.\pipe\weave-host-` + spec.Manifest.ID + "-" + token[:8]
 	}
-	hostLis, err := ipc.Listen(hostAddr)
+	hostLis, err := ipc.ListenAuthorized(hostAddr, authorizeModulePeer(spec.Manifest))
 	if err != nil {
 		return nil, fmt.Errorf("host listener: %w", err)
 	}

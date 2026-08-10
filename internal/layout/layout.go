@@ -53,11 +53,18 @@ func Resolve(override string) Layout {
 	}
 }
 
-// Ensure creates every directory with owner-only permissions. RunDir holds
-// sockets: 0700 is the access-control gate, not decoration.
+// Ensure creates every directory with owner-only permissions AND tightens
+// any that already exist but are too permissive. MkdirAll does not chmod an
+// existing directory, so an installer that created StateDir 0755 would
+// silently break the "0700 is the gate" assumption the store and sockets
+// rely on; the explicit chmod repairs that. RunDir holds sockets: 0700 is
+// access control, not decoration.
 func (l Layout) Ensure() error {
 	for _, d := range []string{l.StateDir, l.LogDir, l.RunDir, l.StagingDir, l.ModulesDir} {
 		if err := os.MkdirAll(d, 0o700); err != nil {
+			return err
+		}
+		if err := tightenDir(d); err != nil {
 			return err
 		}
 	}
