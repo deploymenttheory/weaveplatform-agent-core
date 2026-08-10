@@ -154,6 +154,39 @@ func TestModuleRunsAndRestartsAfterKill(t *testing.T) {
 	}
 }
 
+// TestCoreRefusesOutOfWindowProtocol drives the REAL supervisor (not the
+// testkit StubCore) with a window that excludes the module's protocol. The
+// module must exit 78 before listening and the supervisor must record it as
+// unsupported — no restart, no PID — proving the clean-refusal path on the
+// production launch code, not just the fixture.
+func TestCoreRefusesOutOfWindowProtocol(t *testing.T) {
+	bin := buildTestModule(t)
+	sup := newTestSupervisor(t)
+	// The test module speaks protocol 1; advertise a window past it.
+	sup.Window = handshake.Window{Min: 2, Max: 4}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sup.SetBaseContext(ctx)
+
+	if err := sup.Add(Spec{Manifest: testManifest("platform.osinfo"), BinPath: bin}); err != nil {
+		t.Fatal(err)
+	}
+	st := waitState(t, sup, StateUnsupportedProtocol, 15*time.Second)
+	if st.Restarts != 0 {
+		t.Errorf("unsupported-protocol module restarted %d times; refusal must be terminal", st.Restarts)
+	}
+	if st.PID != 0 {
+		t.Errorf("unsupported-protocol module has PID %d; it must never have listened", st.PID)
+	}
+
+	// Give it a beat to prove it stays refused, never flipping to running.
+	time.Sleep(500 * time.Millisecond)
+	final := sup.Statuses()[0]
+	if final.State != StateUnsupportedProtocol {
+		t.Fatalf("state = %s, want stable unsupported-protocol", final.State)
+	}
+}
+
 // TestWatchdogSatisfiedByHealthyModule proves the push watchdog end to end:
 // with an interval set and the Keepalive seam wired, a real module built on
 // the SDK pings on its own cadence, so the supervisor must NOT restart it.

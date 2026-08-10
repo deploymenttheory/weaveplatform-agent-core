@@ -8,16 +8,33 @@ package protocompat
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
 	"time"
 
+	"github.com/deploymenttheory/weaveplatform-agent/internal/core"
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
 	"github.com/deploymenttheory/weaveplatform-sdk/modulesdk/testkit"
 )
+
+// TestEveryWindowMemberHasFixture is the invariant that keeps §11 honest as
+// the window moves: for every protocol in core's advertised window there
+// must be a pinned vN/ fixture directory, so a bump can never quietly drop
+// compat coverage for a protocol core still claims to support.
+func TestEveryWindowMemberHasFixture(t *testing.T) {
+	for p := core.Window.Min; p <= core.Window.Max; p++ {
+		dir := fmt.Sprintf("v%d", p)
+		if _, err := os.Stat(filepath.Join(dir, "main.go")); err != nil {
+			t.Errorf("core advertises protocol %d but %s/main.go is missing: add the pinned fixture",
+				p, dir)
+		}
+	}
+}
 
 // buildFixture builds the pinned protocol-1 module OUTSIDE the workspace
 // so its go.mod pins, not the checked-out trees, decide what it links.

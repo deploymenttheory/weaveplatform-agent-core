@@ -87,6 +87,49 @@ func TestTokenGateRejects(t *testing.T) {
 	}
 }
 
+// TestTokenGateRejectsStream proves the gate also guards streaming RPCs,
+// not just unary ones: the interceptor runs before the first Recv.
+func TestTokenGateRejectsStream(t *testing.T) {
+	conn := serve(t, "m", "the-right-token", nil)
+	policy := agentv1.NewPolicyServiceClient(conn)
+
+	cases := map[string]context.Context{
+		"no token":    context.Background(),
+		"wrong token": withToken("nope"),
+	}
+	for name, ctx := range cases {
+		t.Run(name, func(t *testing.T) {
+			cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			stream, err := policy.Watch(cctx, &agentv1.PolicyWatchRequest{})
+			if err == nil {
+				_, err = stream.Recv() // the gate fires here at the latest
+			}
+			if status.Code(err) != codes.Unauthenticated {
+				t.Fatalf("Watch with %s: code = %v, want Unauthenticated", name, status.Code(err))
+			}
+		})
+	}
+}
+
+// TestTokenGateRejectsCrossModuleToken proves a token minted for one module
+// does not open another module's server: each server validates its own
+// token, so a stolen sibling token is just a wrong token.
+func TestTokenGateRejectsCrossModuleToken(t *testing.T) {
+	// Two independent per-module servers with distinct tokens.
+	connA := serve(t, "a", "token-a", nil)
+	_ = serve(t, "b", "token-b", nil)
+
+	storeA := agentv1.NewStoreServiceClient(connA)
+	// Present module b's token to module a's server.
+	cctx, cancel := context.WithTimeout(withToken("token-b"), 5*time.Second)
+	defer cancel()
+	_, err := storeA.Put(cctx, &agentv1.StorePutRequest{Key: "k", Value: []byte("v")})
+	if status.Code(err) != codes.Unauthenticated {
+		t.Fatalf("module a accepted module b's token: code = %v, want Unauthenticated", status.Code(err))
+	}
+}
+
 func TestSubscribeAuthorization(t *testing.T) {
 	// Module may subscribe to "other.*" but not "secret.*" or "*".
 	conn := serve(t, "m", "tok", []string{"other.*", "self.exact"})
