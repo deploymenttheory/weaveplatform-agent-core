@@ -1,50 +1,40 @@
 // Command weaveboot supervises core so core can be replaced in place:
 // staged, health-gated, with rollback. launchd/SCM own weaveboot only;
 // weaveboot owns core; core owns modules.
-//
-// Implemented in milestone M8. Until then it execs core directly so the
-// installed process tree has the final shape from day one.
 package main
 
 import (
 	"context"
-	"fmt"
+	"flag"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
+
+	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
+	"github.com/deploymenttheory/weaveplatform-agent/internal/weaveboot"
+	"github.com/deploymenttheory/weaveplatform-sdk/wlog"
 )
 
 func main() {
-	self, err := os.Executable()
-	if err != nil {
-		fatal("locating self: %v", err)
-	}
-	agent := filepath.Join(filepath.Dir(self), agentBinaryName())
-	if _, err := os.Stat(agent); err != nil {
-		fatal("core binary not found beside weaveboot: %v", err)
-	}
+	stateDir := flag.String("state-dir", "", "override the state directory (also WEAVE_STATE_DIR)")
+	flag.Parse()
+
+	log := wlog.Default("weaveboot")
+	lay := layout.Resolve(*stateDir)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 
-	cmd := exec.CommandContext(ctx, agent, os.Args[1:]...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		fatal("core exited: %v", err)
+	// Everything after -- goes to weave-agent; the state dir always does.
+	agentArgs := append([]string{"--state-dir", lay.StateDir}, flag.Args()...)
+	err := weaveboot.Run(ctx, weaveboot.Options{
+		Log:       log,
+		CoreDir:   filepath.Join(lay.StateDir, "core"),
+		AgentArgs: agentArgs,
+	})
+	if err != nil {
+		log.Error("weaveboot failed", "err", err)
+		os.Exit(1)
 	}
-}
-
-func agentBinaryName() string {
-	if isWindows {
-		return "weave-agent.exe"
-	}
-	return "weave-agent"
-}
-
-func fatal(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "weaveboot: "+format+"\n", args...)
-	os.Exit(1)
 }
