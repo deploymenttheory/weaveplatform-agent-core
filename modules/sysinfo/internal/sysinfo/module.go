@@ -73,24 +73,23 @@ func (m *Module) Init(ctx context.Context, host modulesdk.Host) error {
 		}()
 	}
 
-	if err := host.UI().Declare(modulesdk.Surface{
+	return host.UI().Declare(modulesdk.Surface{
 		ID:    "inventory",
 		Title: "Host inventory",
 		Kind:  "card",
-	}); err != nil {
-		return err
-	}
+	})
+}
 
-	// The scheduled collection: runs once at Start, then on each interval.
-	// EveryFunc re-reads the interval each cycle so a policy change to
-	// sysinfo/interval actually changes the collection cadence, not just
-	// the reported value.
-	host.Schedule(modulesdk.Job{
+// Jobs implements modulesdk.Scheduled: the recurring collection, run once
+// at Start then on each interval. EveryFunc re-reads the interval each
+// cycle so a policy change to sysinfo/interval actually changes the
+// collection cadence, not just the reported value.
+func (m *Module) Jobs() []modulesdk.Job {
+	return []modulesdk.Job{{
 		Name:      "collect",
 		EveryFunc: m.currentInterval,
 		Run:       m.collectAndReport,
-	})
-	return nil
+	}}
 }
 
 // SetConfig is called by the runtime before Init with the raw config doc.
