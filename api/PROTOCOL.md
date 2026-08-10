@@ -14,6 +14,26 @@ declares the single protocol it speaks. Compatibility is negotiated at handshake
 tabulated. **An N-2 window is the default**: core at protocol N accepts modules built against
 N-1 and N-2 and cleanly refuses anything older.
 
+```mermaid
+flowchart LR
+    subgraph window["core at protocol 3 advertises window [1,3]"]
+        direction LR
+        m3["module @ 3"]
+        m2["module @ 2 (N-1)"]
+        m1["module @ 1 (N-2)"]
+    end
+    m0["module @ 0 / future @ 4"]
+    window ==>|"accepted: handshake proceeds"| run["Init → Start → supervised"]
+    m0 -->|"refused: exit 78 before listening —<br/>logged as unsupported, never restarted"| stop["no crash loop"]
+
+    style run fill:#238636,color:#fff
+    style stop fill:#da3633,color:#fff
+```
+
+The refusal path is as designed as the acceptance path: `test/protocompat` in
+weaveplatform-agent keeps a module frozen at each protocol and proves both directions on
+every CI run, forever.
+
 ## What bumps the integer
 
 A protocol bump is rare and deliberate — a design review, not a side effect. Bump when:

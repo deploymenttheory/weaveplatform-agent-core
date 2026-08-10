@@ -4,9 +4,12 @@ Contracts for the Weave platform agent: protobuf definitions, JSON schemas, and 
 Go they produce. This repo is the root of the dependency graph — everything imports it, it
 imports nothing.
 
-```
-weaveplatform-api  ←  weaveplatform-sdk  ←  weaveplatform-agent
-                                        ←  weaveplatform-agent-modules
+```mermaid
+flowchart LR
+    api[<b>weaveplatform-api</b><br/>this repo] --> sdk[weaveplatform-sdk]
+    sdk --> agent[weaveplatform-agent]
+    sdk --> modules[weaveplatform-agent-modules]
+    style api fill:#1f6feb,color:#fff
 ```
 
 ## Contents
