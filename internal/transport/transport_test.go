@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
@@ -86,5 +87,47 @@ func TestSendQueueAndFlush(t *testing.T) {
 	}
 	if keys, _ := queue.List(context.Background(), "core.transport", "queue/"); len(keys) != 0 {
 		t.Fatalf("queue not drained: %v", keys)
+	}
+}
+
+// TestConcurrentOfflineSendsNoLossNoDup fires many offline sends at once with
+// the peer down: the monotonic queue key must not race (no overwrite, no
+// loss), and when the peer returns every message flushes exactly once (no
+// double delivery under the flush mutex).
+func TestConcurrentOfflineSendsNoLossNoDup(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
+	queue := hostserv.NewMemStore()
+	// No peer wired yet: every send with queueOffline lands in the queue.
+	mux := &Mux{Log: log, Queue: queue}
+
+	const n = 50
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, _ = mux.Send(context.Background(), "sysinfo", agentv1.Peer_PEER_GATEWEAVE,
+				"heartbeat", []byte{byte(i)}, true)
+		}(i)
+	}
+	wg.Wait()
+
+	keys, _ := queue.List(context.Background(), "core.transport", "queue/")
+	if len(keys) != n {
+		t.Fatalf("queued %d messages, want %d (a racing key overwrote or dropped one)", len(keys), n)
+	}
+
+	// Bring a peer up and flush; the stub must receive each message once.
+	stub := stubgateweave.New()
+	srv := httptest.NewServer(stub.Handler())
+	defer srv.Close()
+	mux.GateWeave = &HTTPPeer{URL: srv.URL + "/v1/messages", Device: func() string { return "device-1" }}
+	mux.Flush(agentv1.Peer_PEER_GATEWEAVE)
+
+	if got := len(stub.Messages()); got != n {
+		t.Fatalf("stub received %d messages, want %d (loss or double delivery)", got, n)
+	}
+	if keys, _ := queue.List(context.Background(), "core.transport", "queue/"); len(keys) != 0 {
+		t.Fatalf("queue not drained after flush: %d left", len(keys))
 	}
 }
