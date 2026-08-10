@@ -48,7 +48,48 @@ jobs:
           CGO_ENABLED: "0"
         run: go test ./...
 
-      - name: Build (all packages)
+      # No committed go.work in CI: build resolves against go.mod pins as a
+      # consumer would. GOWORK=off makes that explicit so a local workspace
+      # can never mask a stale cross-repo pin (a skew that bit us once).
+      - name: Build (GOWORK=off)
         env:
           CGO_ENABLED: "0"
+          GOWORK: "off"
         run: go build ./...
+
+  race:
+    # Race detector needs cgo; run it where a C toolchain is reliable.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Harden Runner
+        if: runner.os == 'Linux'
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Configure private module access
+        env:
+          TOKEN: ${{ secrets.GOMODULES_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::GOMODULES_TOKEN secret is not set — required to fetch private weaveplatform-api"
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${TOKEN}@github.com/deploymenttheory/".insteadOf "https://github.com/deploymenttheory/"
+          echo "GOPRIVATE=github.com/deploymenttheory/*" >> "$GITHUB_ENV"
+
+      - name: Test (-race)
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race ./...

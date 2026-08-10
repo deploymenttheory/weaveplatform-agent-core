@@ -50,6 +50,18 @@ jobs:
 
       - uses: sigstore/cosign-installer@v3
 
+      # Release builds must be production builds: the `dev` build tag turns
+      # on the manifest-root-pub override and insecure enrolment, which must
+      # never ship. Fail the release if it leaks into the build config.
+      - name: Guard against dev build tag
+        shell: bash
+        run: |
+          if grep -rEn '[-]tags[ =]+([^ ]*,)?dev\b' .goreleaser.yaml; then
+            echo "::error::a 'dev' build tag is present in .goreleaser.yaml — release builds must be production"
+            exit 1
+          fi
+          echo "no dev build tag in the release build config"
+
       - name: Run goreleaser
         uses: goreleaser/goreleaser-action@v6
         with:
