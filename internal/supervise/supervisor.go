@@ -121,12 +121,14 @@ func (s *Supervisor) capabilityList() []*agentv1.Capability {
 // the capability probe. Gated modules are registered (visible to
 // operators) but never launched.
 func (s *Supervisor) Add(ctx context.Context, spec Spec) {
+	runCtx, cancel := context.WithCancel(ctx)
 	r := &runner{
-		sup:   s,
-		spec:  spec,
-		log:   s.Log.With("module", spec.Manifest.ID),
-		state: StatePending,
-		since: time.Now(),
+		sup:    s,
+		spec:   spec,
+		log:    s.Log.With("module", spec.Manifest.ID),
+		state:  StatePending,
+		since:  time.Now(),
+		cancel: cancel,
 	}
 	s.mu.Lock()
 	if s.runners == nil {
@@ -144,8 +146,30 @@ func (s *Supervisor) Add(ctx context.Context, spec Spec) {
 	r.wg.Add(1)
 	go func() {
 		defer r.wg.Done()
-		r.run(ctx)
+		r.run(runCtx)
 	}()
+}
+
+// StopModule winds one module down (drain, shutdown, kill after grace)
+// and unregisters it. No-op for unknown ids.
+func (s *Supervisor) StopModule(id string) {
+	s.mu.Lock()
+	r := s.runners[id]
+	delete(s.runners, id)
+	s.mu.Unlock()
+	if r == nil {
+		return
+	}
+	r.cancel()
+	r.wg.Wait()
+}
+
+// Replace hot-swaps a module: the old process drains and stops, then the
+// new spec starts. The caller health-gates the result and rolls back on
+// failure.
+func (s *Supervisor) Replace(ctx context.Context, spec Spec) {
+	s.StopModule(spec.Manifest.ID)
+	s.Add(ctx, spec)
 }
 
 // SweepOrphans clears leftover per-module socket dirs from a previous core
@@ -191,10 +215,11 @@ func (s *Supervisor) Wait() {
 
 // runner is one module's supervision loop.
 type runner struct {
-	sup  *Supervisor
-	spec Spec
-	log  *slog.Logger
-	wg   sync.WaitGroup
+	sup    *Supervisor
+	spec   Spec
+	log    *slog.Logger
+	wg     sync.WaitGroup
+	cancel context.CancelFunc
 
 	mu       sync.Mutex
 	state    State

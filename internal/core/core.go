@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/capability"
@@ -16,6 +17,7 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
+	"github.com/deploymenttheory/weaveplatform-agent/internal/lifecycle"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/policy"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/store"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/store/keyprotect"
@@ -45,7 +47,12 @@ type Options struct {
 	GateWeaveURL string
 	// PolicyInterval overrides the poll cadence (dev; zero = default).
 	PolicyInterval time.Duration
-	Log            *slog.Logger
+	// ManifestURL is where the signed channel manifest bundle lives.
+	ManifestURL string
+	// RootPubPath loads the manifest root public key from a file (dev/
+	// self-hosted); release packaging embeds it instead.
+	RootPubPath string
+	Log         *slog.Logger
 }
 
 // Run starts core and blocks until ctx ends.
@@ -129,9 +136,29 @@ func Run(ctx context.Context, opts Options) error {
 		sup.Add(ctx, spec)
 	}
 
+	lcm := &lifecycle.Manager{
+		Log:         log,
+		Layout:      lay,
+		Verifier:    verifier,
+		Supervisor:  sup,
+		ManifestURL: opts.ManifestURL,
+	}
+	if opts.RootPubPath != "" {
+		data, err := os.ReadFile(opts.RootPubPath)
+		if err != nil {
+			return fmt.Errorf("reading manifest root key: %w", err)
+		}
+		_, raw, err := manifest.ParsePublicKey(data)
+		if err != nil {
+			return fmt.Errorf("manifest root key: %w", err)
+		}
+		lcm.RootPub = raw
+	}
+
 	ctl := &controlsock.Server{
 		Log:        log,
 		Supervisor: sup,
+		Lifecycle:  lcm,
 		Window:     Window,
 		DeviceID:   identity.DeviceID,
 		StartedAt:  time.Now(),
@@ -168,6 +195,11 @@ func discoverModules(dir string) ([]supervise.Spec, error) {
 			continue
 		}
 		mdir := filepath.Join(dir, e.Name())
+		// Versioned layout (installed by the lifecycle manager): a
+		// `current` file names the active version directory.
+		if cur, err := os.ReadFile(filepath.Join(mdir, "current")); err == nil {
+			mdir = filepath.Join(mdir, "versions", strings.TrimSpace(string(cur)))
+		}
 		mpath := filepath.Join(mdir, "module.manifest.json")
 		m, err := manifest.Load(mpath)
 		if err != nil {

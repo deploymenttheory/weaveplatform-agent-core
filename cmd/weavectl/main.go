@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/tabwriter"
 	"time"
 
@@ -17,9 +18,12 @@ import (
 const usage = `weavectl — Weave platform agent control
 
 Usage:
-  weavectl [-socket PATH] status     core status
-  weavectl [-socket PATH] modules    supervised module states
-  weavectl [-socket PATH] surfaces   declared UI surfaces
+  weavectl [-socket PATH] status                        core status
+  weavectl [-socket PATH] modules                       supervised module states
+  weavectl [-socket PATH] surfaces                      declared UI surfaces
+  weavectl [-socket PATH] install <module> [version]    install from the channel manifest
+  weavectl [-socket PATH] install -local <dir>          install from a local directory (dev)
+  weavectl [-socket PATH] rollback <module>             flip to the retained previous version
 `
 
 func main() {
@@ -95,6 +99,46 @@ func main() {
 					ms.GetModuleId(), s.GetId(), s.GetKind(), s.GetTitle(), len(s.GetData()))
 			}
 		}
+
+	case "install":
+		req := &controlv1.InstallRequest{}
+		args := flag.Args()[1:]
+		if len(args) >= 2 && args[0] == "-local" {
+			abs, err := filepath.Abs(args[1])
+			if err != nil {
+				fatal("resolving path: %v", err)
+			}
+			req.LocalPath = abs
+		} else if len(args) >= 1 {
+			req.ModuleId = args[0]
+			if len(args) >= 2 {
+				req.Version = args[1]
+			}
+		} else {
+			flag.Usage()
+			os.Exit(2)
+		}
+		// Install includes the health gate; give it time.
+		ictx, icancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer icancel()
+		resp, err := client.Install(ictx, req)
+		if err != nil {
+			fatal("install: %v", err)
+		}
+		fmt.Printf("installed %s\n", resp.GetInstalledVersion())
+
+	case "rollback":
+		if flag.Arg(1) == "" {
+			flag.Usage()
+			os.Exit(2)
+		}
+		rctx, rcancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer rcancel()
+		resp, err := client.Rollback(rctx, &controlv1.RollbackRequest{ModuleId: flag.Arg(1)})
+		if err != nil {
+			fatal("rollback: %v", err)
+		}
+		fmt.Printf("rolled back to %s\n", resp.GetRolledBackTo())
 
 	default:
 		flag.Usage()

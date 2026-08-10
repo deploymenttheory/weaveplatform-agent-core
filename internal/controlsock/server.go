@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/deploymenttheory/weaveplatform-agent/internal/lifecycle"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/version"
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
@@ -25,6 +26,7 @@ type Server struct {
 
 	Log        *slog.Logger
 	Supervisor *supervise.Supervisor
+	Lifecycle  *lifecycle.Manager
 	Window     handshake.Window
 	DeviceID   string
 	StartedAt  time.Time
@@ -94,14 +96,29 @@ func (s *Server) Surfaces(ctx context.Context, _ *controlv1.SurfacesRequest) (*c
 	return &controlv1.SurfacesResponse{Modules: out}, nil
 }
 
-// Install implements ControlService. Lands with the lifecycle milestone.
-func (s *Server) Install(ctx context.Context, _ *controlv1.InstallRequest) (*controlv1.InstallResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "module install lands with the lifecycle milestone")
+// Install implements ControlService: a local-directory install (dev) or a
+// channel install by id/version.
+func (s *Server) Install(ctx context.Context, req *controlv1.InstallRequest) (*controlv1.InstallResponse, error) {
+	var version string
+	var err error
+	if req.GetLocalPath() != "" {
+		version, err = s.Lifecycle.InstallLocal(ctx, req.GetLocalPath())
+	} else {
+		version, err = s.Lifecycle.Install(ctx, req.GetModuleId(), req.GetVersion())
+	}
+	if err != nil {
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	}
+	return &controlv1.InstallResponse{InstalledVersion: version}, nil
 }
 
-// Rollback implements ControlService. Lands with the lifecycle milestone.
-func (s *Server) Rollback(ctx context.Context, _ *controlv1.RollbackRequest) (*controlv1.RollbackResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "module rollback lands with the lifecycle milestone")
+// Rollback implements ControlService.
+func (s *Server) Rollback(ctx context.Context, req *controlv1.RollbackRequest) (*controlv1.RollbackResponse, error) {
+	version, err := s.Lifecycle.Rollback(ctx, req.GetModuleId())
+	if err != nil {
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	}
+	return &controlv1.RollbackResponse{RolledBackTo: version}, nil
 }
 
 // Logs implements ControlService. Lands with the log pipeline.

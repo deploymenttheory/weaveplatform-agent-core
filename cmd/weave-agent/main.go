@@ -22,6 +22,10 @@ func main() {
 	gateweaveURL := flag.String("gateweave-url", os.Getenv("WEAVE_GATEWEAVE_URL"),
 		"GateWeave policy endpoint; empty runs offline on cached policy")
 	policyInterval := flag.Duration("policy-interval", 0, "policy poll interval override (dev)")
+	manifestURL := flag.String("manifest-url", os.Getenv("WEAVE_MANIFEST_URL"),
+		"base URL of the signed channel manifest bundle")
+	rootPub := flag.String("manifest-root-pub", os.Getenv("WEAVE_MANIFEST_ROOT_PUB"),
+		"path to the manifest root public key (dev/self-hosted)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
@@ -41,6 +45,8 @@ func main() {
 		Verifier:       verify.New(log),
 		GateWeaveURL:   *gateweaveURL,
 		PolicyInterval: *policyInterval,
+		ManifestURL:    *manifestURL,
+		RootPubPath:    *rootPub,
 		Log:            log,
 	})
 	if err != nil {
