@@ -244,8 +244,12 @@ Dependency direction is one-way and enforced by repository (and go.mod) boundary
 ```
 weaveplatform-api  ←  weaveplatform-sdk  ←  weaveplatform-agent
                                         ←  weaveplatform-agent-modules/<module>
-go-bindings-*      ←  weaveplatform-agent-modules/<module>   (directly, at protocol-pinned versions)
+go-bindings-*      ←  weaveplatform-sdk/platform   (the platform seam wraps the bindings)
+go-bindings-*      ←  weaveplatform-agent-modules/<module>   (product-specific APIs, directly)
 ```
+
+Either way the `go-bindings-*` versions are pinned by the protocol (§6), recorded in the
+channel manifest's `bindings` block.
 
 Core and modules never import each other. Products never import each other. Anything two products
 share moves up.
