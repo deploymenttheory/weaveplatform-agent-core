@@ -28,8 +28,12 @@ type Server struct {
 	Supervisor *supervise.Supervisor
 	Lifecycle  *lifecycle.Manager
 	Window     handshake.Window
-	DeviceID   string
-	StartedAt  time.Time
+	// Identity answers WhoAmI/Enrolled for Status.
+	Identity interface {
+		WhoAmI() (string, bool, string)
+		Enrolled() bool
+	}
+	StartedAt time.Time
 
 	grpcServer *grpc.Server
 }
@@ -52,11 +56,12 @@ func (s *Server) Serve(ctx context.Context, addr string) error {
 
 // Status implements ControlService.
 func (s *Server) Status(ctx context.Context, _ *controlv1.StatusRequest) (*controlv1.StatusResponse, error) {
+	deviceID, _, _ := s.Identity.WhoAmI()
 	return &controlv1.StatusResponse{
 		CoreVersion:   version.Version,
 		Protocol:      &agentv1.ProtocolRange{Min: s.Window.Min, Max: s.Window.Max},
-		DeviceId:      s.DeviceID,
-		Enrolled:      false,
+		DeviceId:      deviceID,
+		Enrolled:      s.Identity.Enrolled(),
 		UptimeSeconds: uint64(time.Since(s.StartedAt).Seconds()),
 	}, nil
 }

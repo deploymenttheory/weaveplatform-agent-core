@@ -16,12 +16,14 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/controlsock"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
+	"github.com/deploymenttheory/weaveplatform-agent/internal/identity"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/lifecycle"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/policy"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/store"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/store/keyprotect"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
+	"github.com/deploymenttheory/weaveplatform-agent/internal/transport"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/version"
 	"github.com/deploymenttheory/weaveplatform-api/manifest"
 	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
@@ -42,8 +44,10 @@ type Options struct {
 	// Verifier authenticates module binaries. Nil refuses everything —
 	// core fails closed until the verify milestone wires the real one.
 	Verifier supervise.Verifier
-	// GateWeaveURL is the policy endpoint (e.g. the stub's /v1/policy).
-	// Empty runs offline: cached policy only.
+	// GateWeaveURL is the platform service's base URL (the stub until
+	// GateWeave exists); core derives /v1/policy, /v1/enroll and
+	// /v1/messages from it. Empty runs offline: cached policy, ephemeral
+	// identity, queued sends.
 	GateWeaveURL string
 	// PolicyInterval overrides the poll cadence (dev; zero = default).
 	PolicyInterval time.Duration
@@ -91,23 +95,54 @@ func Run(ctx context.Context, opts Options) error {
 	}
 	defer st.Close()
 
+	base := strings.TrimSuffix(opts.GateWeaveURL, "/")
+	endpoint := func(p string) string {
+		if base == "" {
+			return ""
+		}
+		return base + p
+	}
+
 	policyMgr := &policy.Manager{
 		Log:      log,
-		URL:      opts.GateWeaveURL,
+		URL:      endpoint("/v1/policy"),
 		Interval: opts.PolicyInterval,
 		Cache:    st,
 	}
 	policyMgr.Load()
 	go policyMgr.Run(ctx)
 
-	identity := hostserv.NewStubIdentity()
+	ident := &identity.Provider{
+		Log:       log,
+		Store:     st,
+		EnrollURL: endpoint("/v1/enroll"),
+	}
+	if err := ident.Init(); err != nil {
+		return fmt.Errorf("identity: %w", err)
+	}
+	if err := ident.Enroll(ctx); err != nil {
+		// Enrolment failure is not fatal: run ephemeral, retry later.
+		log.Warn("enrolment failed; continuing unenrolled", "err", err)
+	}
+
+	mux := &transport.Mux{Log: log, Queue: st}
+	if base != "" {
+		mux.GateWeave = &transport.HTTPPeer{
+			URL: endpoint("/v1/messages"),
+			Device: func() string {
+				id, _, _ := ident.WhoAmI()
+				return id
+			},
+		}
+	}
+
 	services := &hostserv.Services{
 		Log:       log,
 		Bus:       eventbus.New(),
 		Store:     st,
 		Policy:    policyMgr,
-		Identity:  identity,
-		Transport: &hostserv.LogTransport{Log: log},
+		Identity:  ident,
+		Transport: mux,
 	}
 
 	sup := &supervise.Supervisor{
@@ -160,7 +195,7 @@ func Run(ctx context.Context, opts Options) error {
 		Supervisor: sup,
 		Lifecycle:  lcm,
 		Window:     Window,
-		DeviceID:   identity.DeviceID,
+		Identity:   ident,
 		StartedAt:  time.Now(),
 	}
 	ctlErr := make(chan error, 1)

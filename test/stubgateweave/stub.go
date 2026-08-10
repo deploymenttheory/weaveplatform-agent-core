@@ -19,6 +19,16 @@ type Server struct {
 	enrolled map[string]string // enrolment token → device id
 	// Artifacts served under /artifacts/<name>.
 	artifacts map[string][]byte
+	// Messages received on /v1/messages.
+	messages []ReceivedMessage
+}
+
+// ReceivedMessage is one message a device sent.
+type ReceivedMessage struct {
+	DeviceID string `json:"device_id"`
+	Module   string `json:"module"`
+	Kind     string `json:"kind"`
+	Data     []byte `json:"data"`
 }
 
 // New returns an empty stub.
@@ -45,6 +55,13 @@ func (s *Server) SetArtifact(name string, data []byte) {
 	s.artifacts[name] = data
 }
 
+// Messages returns everything received on /v1/messages.
+func (s *Server) Messages() []ReceivedMessage {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]ReceivedMessage(nil), s.messages...)
+}
+
 // Handler returns the HTTP surface.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
@@ -64,6 +81,17 @@ func (s *Server) Handler() http.Handler {
 		s.enrolled[id] = id
 		s.mu.Unlock()
 		json.NewEncoder(w).Encode(map[string]string{"device_id": id, "tenant": "stub"}) //nolint:errcheck
+	})
+	mux.HandleFunc("POST /v1/messages", func(w http.ResponseWriter, r *http.Request) {
+		var msg ReceivedMessage
+		if err := json.NewDecoder(r.Body).Decode(&msg); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.mu.Lock()
+		s.messages = append(s.messages, msg)
+		s.mu.Unlock()
+		w.WriteHeader(http.StatusAccepted)
 	})
 	mux.HandleFunc("GET /artifacts/{name}", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
