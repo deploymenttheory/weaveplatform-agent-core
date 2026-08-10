@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.1.1...v0.2.0) (2026-08-10)
+
+
+### Features
+
+* event sequence stamping, drop visibility, bindings-decouple doc ([c1b63a8](https://github.com/deploymenttheory/weaveplatform-agent/commit/c1b63a8717c1a215f3a122aaef8981914bd8dac7))
+* **S10:** enrolment hardening — signed challenge + pinned server assignment ([8591d92](https://github.com/deploymenttheory/weaveplatform-agent/commit/8591d92b8505cdea98eeaacb374e595ade4658cb))
+* security hardening (part 1) — verify, trust anchor, anti-rollback, isolation ([fad2026](https://github.com/deploymenttheory/weaveplatform-agent/commit/fad2026241a1cadc2fd410b7df4cdcc23448a61f))
+* security hardening (part 2) — peer-cred, DPAPI entropy, SDDL, Authenticode, dir perms ([818e791](https://github.com/deploymenttheory/weaveplatform-agent/commit/818e7915520613182a29a1217997c2c42f4bf01a))
+
+
+### Bug Fixes
+
+* P0 correctness bugs from the combative design review ([543c330](https://github.com/deploymenttheory/weaveplatform-agent/commit/543c330be6e0e0fe5b51016fdb7d62ba60c77561))
+
 ## [0.1.1](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.1.0...v0.1.1) (2026-08-10)
 
 
