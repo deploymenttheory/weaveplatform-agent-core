@@ -18,6 +18,7 @@ weaveplatform-api  ←  weaveplatform-sdk  ←  weaveplatform-agent
 | `schema/` | JSON Schemas for the module manifest and the signed channel manifest |
 | `gen/go/` | Generated Go, committed — consumers never run protoc |
 | `PROTOCOL.md` | What the protocol integer is, what bumps it, the handshake, the registry |
+| `docs/services.md` | The service map: who serves what, on which socket, and why |
 
 ## Regenerating
 
