@@ -88,6 +88,12 @@ func (s *moduleServer) Init(ctx context.Context, req *agentv1.InitRequest) (*age
 	}
 	s.state = stateInited
 
+	// Record the push-watchdog cadence core asked for; the loop starts with
+	// the jobs on Start and stops with them on Stop. Zero disables it.
+	if secs := req.GetWatchdogIntervalSeconds(); secs > 0 {
+		host.setWatchdogInterval(time.Duration(secs) * time.Second)
+	}
+
 	// Collect the module's recurring jobs (if any) now; the runtime owns
 	// their lifecycle — started at Start, cancelled at Stop.
 	if sched, ok := s.m.(Scheduled); ok {

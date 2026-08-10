@@ -29,12 +29,16 @@ type hostClient struct {
 	store     agentv1.StoreServiceClient
 	events    agentv1.EventBusServiceClient
 	logs      agentv1.LogServiceClient
+	watchdog  agentv1.WatchdogServiceClient
 
 	streamedLog *slog.Logger
 
 	mu       sync.Mutex
 	surfaces []Surface
 	jobs     []Job
+	// watchdogInterval is the cadence core asked for in InitRequest; zero
+	// disables the push watchdog.
+	watchdogInterval time.Duration
 	// jobCancel is non-nil while jobs are running (between Start and Stop).
 	jobCancel context.CancelFunc
 	jobCtx    context.Context
@@ -68,6 +72,7 @@ func dialHost(network, addr, token string, log *slog.Logger) (*hostClient, error
 		store:     agentv1.NewStoreServiceClient(conn),
 		events:    agentv1.NewEventBusServiceClient(conn),
 		logs:      agentv1.NewLogServiceClient(conn),
+		watchdog:  agentv1.NewWatchdogServiceClient(conn),
 	}
 	// Host.Log streams to core's LogService with the stderr logger as the
 	// pre-Init / on-failure fallback.
@@ -358,6 +363,14 @@ func (h *hostClient) addJobs(jobs []Job) {
 	h.jobs = append(h.jobs, jobs...)
 }
 
+// setWatchdogInterval records the cadence core asked for in InitRequest.
+// Called by the runtime during Init, before startJobs.
+func (h *hostClient) setWatchdogInterval(d time.Duration) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.watchdogInterval = d
+}
+
 // startJobs begins all registered jobs. Called by the runtime on Start.
 func (h *hostClient) startJobs(parent context.Context) {
 	h.mu.Lock()
@@ -372,6 +385,47 @@ func (h *hostClient) startJobs(parent context.Context) {
 	for _, j := range h.jobs {
 		h.launchJobLocked(j)
 	}
+	if h.watchdogInterval > 0 {
+		h.launchWatchdogLocked(ctx, h.watchdogInterval)
+	}
+}
+
+// launchWatchdogLocked runs the push-watchdog ping loop for the runtime's
+// lifetime (cancelled on Stop). It opens WatchdogService.Notify and sends a
+// ping every interval; a broken stream is reopened on the next tick so a
+// transient blip does not silently end liveness reporting.
+func (h *hostClient) launchWatchdogLocked(ctx context.Context, interval time.Duration) {
+	h.jobWG.Add(1)
+	go func() {
+		defer h.jobWG.Done()
+		var (
+			stream agentv1.WatchdogService_NotifyClient
+			seq    uint64
+		)
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				if stream != nil {
+					_, _ = stream.CloseAndRecv()
+				}
+				return
+			case <-t.C:
+				if stream == nil {
+					s, err := h.watchdog.Notify(ctx)
+					if err != nil {
+						continue // retry on the next tick
+					}
+					stream = s
+				}
+				seq++
+				if err := stream.Send(&agentv1.WatchdogPing{Sequence: seq}); err != nil {
+					stream = nil // reopen next tick
+				}
+			}
+		}
+	}()
 }
 
 func (h *hostClient) launchJobLocked(j Job) {
