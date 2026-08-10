@@ -1,0 +1,47 @@
+name: fuzz
+
+on:
+  schedule:
+    # Nightly at 03:17 UTC — a long soak beyond the seed corpus PRs run.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz-handshake:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Configure private module access
+        env:
+          TOKEN: ${{ secrets.GOMODULES_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::GOMODULES_TOKEN secret is not set"
+            exit 1
+          fi
+          git config --global url."https://x-access-token:${TOKEN}@github.com/deploymenttheory/".insteadOf "https://github.com/deploymenttheory/"
+          echo "GOPRIVATE=github.com/deploymenttheory/*" >> "$GITHUB_ENV"
+
+      - name: Fuzz FuzzParse
+        run: go test ./handshake/ -run '^$' -fuzz '^FuzzParse$' -fuzztime 5m
+
+      - name: Upload crashers
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-handshake-corpus
+          path: handshake/testdata/fuzz
