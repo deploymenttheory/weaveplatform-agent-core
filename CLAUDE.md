@@ -16,11 +16,21 @@ rather than bypass it; if that is genuinely out of scope, note the gap and use
 the narrowest fallback.
 
 "Technically viable" means the binding exposes the call **and** builds where it
-is used. Windows (`go-bindings-win32`/`-wmi`) is pure Go and builds under
-`CGO_ENABLED=0`, so always use it. macOS (`go-bindings-macosplatform`)
-frameworks transitively pull `runtime/cgo` (NSException handling) and need
-`CGO_ENABLED=1`; in a `CGO_ENABLED=0` build they are not viable and `x/sys`
-is the sanctioned fallback for that call, noted in a comment.
+is used. Both SDKs are pure Go and build under `CGO_ENABLED=0`, so both are
+always viable: Windows (`go-bindings-win32`/`-wmi`) is generated Go over
+`syscall`, and macOS (`go-bindings-macosplatform`, **v0.19.0+**) runs its whole
+`bindings/` surface — Objective-C frameworks and Apple C libraries alike — on
+`github.com/ebitengine/purego`, `dlopen`ing the dylib at runtime.
+
+> An earlier version of this rule said the macOS frameworks needed
+> `CGO_ENABLED=1` for NSException handling. That described the pre-purego
+> binding and is no longer true (the binding repo's own README is stale on this
+> point too). What purego does change: an uncaught `NSException` is not
+> converted to a Go panic — it terminates the process. Validate before calling.
+
+Coverage, not cgo, is the remaining macOS limit: `bindings/libraries/bsd` is
+essentially empty, so bare POSIX calls (`sysctl`, `settimeofday`, `fcntl`) have
+no house wrapper and take the fallback below.
 
 ### Only sanctioned fallbacks (no house binding exists)
 

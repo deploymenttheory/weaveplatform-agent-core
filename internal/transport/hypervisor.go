@@ -3,14 +3,15 @@ package transport
 import (
 	"bufio"
 	"context"
-	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"sync"
 
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-api/hvchannel"
 )
 
 // The hypervisor channel is a single byte pipe (virtio-serial / vsock /
@@ -19,22 +20,11 @@ import (
 // reader on the same wire desynchronises it permanently rather than degrading.
 // One fd, one read loop, one write mutex — always.
 //
-// The wire is length-prefixed frames (4-byte big-endian length + payload),
-// each payload a JSON hvEnvelope addressing a module. Core translates between
-// envelopes and the module-facing (module, kind, data) Transport primitives;
-// modules never see framing or device nodes.
-
-// maxFrameSize bounds a single frame, matching the legacy agent (512 MiB), so
-// a corrupt length can't drive an unbounded allocation.
-const maxFrameSize = 512 << 20
-
-// hvEnvelope is the on-wire addressing header: which module a message is for,
-// the operation kind, and the opaque payload. Peer is implicit (hypervisor).
-type hvEnvelope struct {
-	Module string `json:"module"`
-	Kind   string `json:"kind"`
-	Data   []byte `json:"data,omitempty"`
-}
+// The framing and addressing format itself lives in
+// weaveplatform-api/hvchannel, because the host end of this wire must encode
+// identically and nothing on the channel would detect a mismatch. Core
+// translates between hvchannel envelopes and the module-facing (module, kind,
+// data) Transport primitives; modules never see framing or device nodes.
 
 // HypervisorPeer implements Peer over a single owned connection.
 type HypervisorPeer struct {
@@ -80,13 +70,9 @@ func newHypervisorPeer(ctx context.Context, rwc io.ReadWriteCloser, log *slog.Lo
 // Send implements Peer: one addressed frame, written under the single-writer
 // mutex.
 func (p *HypervisorPeer) Send(_ context.Context, module, kind string, data []byte) error {
-	payload, err := json.Marshal(hvEnvelope{Module: module, Kind: kind, Data: data})
-	if err != nil {
-		return err
-	}
 	p.wmu.Lock()
 	defer p.wmu.Unlock()
-	if err := writeFrame(p.w, payload); err != nil {
+	if err := hvchannel.WriteEnvelope(p.w, hvchannel.Envelope{Module: module, Kind: kind, Data: data}); err != nil {
 		return err
 	}
 	return p.w.Flush()
@@ -101,49 +87,30 @@ func (p *HypervisorPeer) readLoop(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		payload, err := readFrame(p.r)
+		env, err := hvchannel.ReadEnvelope(p.r)
 		if err != nil {
+			// An undecodable envelope costs one message, not the channel: the
+			// length prefix has already kept the reader aligned, so carry on.
+			// Only a stream-level failure ends the loop.
+			if isFrameDecodeError(err) {
+				p.log.Warn("hypervisor channel: undecodable frame", "err", err)
+				continue
+			}
 			if err != io.EOF && ctx.Err() == nil {
 				p.log.Warn("hypervisor channel read ended", "err", err)
 			}
 			return
 		}
-		var env hvEnvelope
-		if err := json.Unmarshal(payload, &env); err != nil {
-			p.log.Warn("hypervisor channel: undecodable frame", "err", err)
-			continue // one bad frame is not fatal; the length prefix keeps us aligned
-		}
 		p.deliver(env.Module, env.Kind, env.Data)
 	}
 }
 
-// writeFrame writes a length-prefixed frame.
-func writeFrame(w io.Writer, payload []byte) error {
-	if len(payload) > maxFrameSize {
-		return fmt.Errorf("transport: frame too large: %d", len(payload))
-	}
-	var hdr [4]byte
-	binary.BigEndian.PutUint32(hdr[:], uint32(len(payload)))
-	if _, err := w.Write(hdr[:]); err != nil {
-		return err
-	}
-	_, err := w.Write(payload)
-	return err
-}
-
-// readFrame reads one length-prefixed frame.
-func readFrame(r io.Reader) ([]byte, error) {
-	var hdr [4]byte
-	if _, err := io.ReadFull(r, hdr[:]); err != nil {
-		return nil, err
-	}
-	n := binary.BigEndian.Uint32(hdr[:])
-	if n > maxFrameSize {
-		return nil, fmt.Errorf("transport: frame length %d exceeds max", n)
-	}
-	buf := make([]byte, n)
-	if _, err := io.ReadFull(r, buf); err != nil {
-		return nil, err
-	}
-	return buf, nil
+// isFrameDecodeError reports whether err is a per-message decode failure (the
+// stream is still aligned) rather than a stream failure (it is not). Framing
+// errors wrap a *json.SyntaxError or *json.UnmarshalTypeError; I/O errors do
+// not.
+func isFrameDecodeError(err error) bool {
+	var syntax *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	return errors.As(err, &syntax) || errors.As(err, &typeErr)
 }

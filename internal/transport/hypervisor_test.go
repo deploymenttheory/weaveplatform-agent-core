@@ -3,7 +3,6 @@ package transport
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-api/hvchannel"
 )
 
 // TestHypervisorLoopback drives the whole channel over an in-process pipe: a
@@ -35,10 +35,9 @@ func TestHypervisorLoopback(t *testing.T) {
 
 	// --- Inbound: host -> guest module ---
 	go func() {
-		payload, _ := json.Marshal(hvEnvelope{
+		_ = hvchannel.WriteEnvelope(hostW, hvchannel.Envelope{
 			Module: "guestweave", Kind: "guestweave.presence.hello", Data: []byte(`{"id":"h1"}`),
 		})
-		_ = writeFrame(hostW, payload)
 		_ = hostW.Flush()
 	}()
 
@@ -63,14 +62,12 @@ func TestHypervisorLoopback(t *testing.T) {
 			"guestweave.presence.hello.result", []byte(`{"id":"h1","payload":{"os":"linux"}}`), false)
 	}()
 
-	done := make(chan hvEnvelope, 1)
+	done := make(chan hvchannel.Envelope, 1)
 	go func() {
-		frame, err := readFrame(hostR)
+		env, err := hvchannel.ReadEnvelope(hostR)
 		if err != nil {
 			return
 		}
-		var env hvEnvelope
-		_ = json.Unmarshal(frame, &env)
 		done <- env
 	}()
 
@@ -81,6 +78,42 @@ func TestHypervisorLoopback(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("outbound frame never reached the host")
+	}
+}
+
+// TestUndecodableFrameDoesNotKillTheChannel locks the read loop's error
+// classification. Reading and decoding are one call now (hvchannel.ReadEnvelope),
+// so the loop has to tell a per-message decode failure — the stream is still
+// aligned, keep going — from a stream failure, where it must stop. Get that
+// backwards and one malformed frame silently ends a channel core cannot
+// re-establish, with the guest still apparently healthy.
+func TestUndecodableFrameDoesNotKillTheChannel(t *testing.T) {
+	guestConn, hostConn := net.Pipe()
+	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	mux := &Mux{Log: log}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mux.Hypervisor = newHypervisorPeer(ctx, guestConn, log, mux.deliver)
+	in := mux.Receive(ctx, "guestweave")
+
+	hostW := bufio.NewWriter(hostConn)
+	go func() {
+		// A frame whose payload is not an envelope, then a good one.
+		_ = hvchannel.WriteFrame(hostW, []byte("{not json"))
+		_ = hvchannel.WriteEnvelope(hostW, hvchannel.Envelope{
+			Module: "guestweave", Kind: "guestweave.power.shutdown", Data: []byte(`{"id":"p1"}`),
+		})
+		_ = hostW.Flush()
+	}()
+
+	select {
+	case msg := <-in:
+		if msg.Kind != "guestweave.power.shutdown" {
+			t.Fatalf("kind = %q, want the message after the bad frame", msg.Kind)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("the read loop stopped on a malformed frame instead of skipping it")
 	}
 }
 
