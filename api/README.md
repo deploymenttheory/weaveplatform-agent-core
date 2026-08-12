@@ -20,8 +20,30 @@ flowchart LR
 | `proto/weave/control/v1/` | `ControlService` — core's control socket, spoken by `weavectl` and the portal |
 | `schema/` | JSON Schemas for the module manifest and the signed channel manifest |
 | `gen/go/` | Generated Go, committed — consumers never run protoc |
+| `hvchannel/` | The hypervisor channel's framing and addressing. Hand-written Go, not generated — see below |
 | `PROTOCOL.md` | What the protocol integer is, what bumps it, the handshake, the registry |
 | `docs/services.md` | The service map: who serves what, on which socket, and why |
+
+## The hypervisor channel
+
+`hvchannel` is the one hand-written Go package here, and the one contract that is
+not a proto: length-prefixed frames carrying a JSON `Envelope{Module, Kind, Data}`
+between core inside a guest and the host tooling outside it.
+
+It lives in this repo because **both ends must encode identically and nothing on
+that wire would catch a mismatch** — there is no negotiation and no version
+exchange, so a field renamed on one side simply stops matching on the other, and
+the symptom is a guest that never answers. Core's transport
+(`weaveplatform-agent/internal/transport`) and the host client
+(`weaveplatform-agent-modules/pkg/guesthost`) both import it.
+
+The format has **no resynchronisation**: a reader that loses its place cannot
+find the next boundary. Each end therefore has exactly one reader and serialises
+its writes. The package deliberately provides no locking — a mutex there would
+imply it was safe to hand one connection to two owners.
+
+It is a different wire from the module protocol, so it does not move the
+protocol integer.
 
 ## Regenerating
 
