@@ -26,6 +26,8 @@ func main() {
 		"base URL of the signed channel manifest bundle")
 	rootPub := flag.String("manifest-root-pub", os.Getenv("WEAVE_MANIFEST_ROOT_PUB"),
 		"path to the manifest root public key (dev/self-hosted)")
+	channelDir := flag.String("channel-dir", os.Getenv("WEAVE_CHANNEL_DIR"),
+		"directory holding a signed channel-manifest bundle to verify modules against (offline installs)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
@@ -39,10 +41,25 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 
+	// An offline install — a VM guest, an air-gapped host — has no manifest
+	// server to fetch from, so the signed channel manifest ships beside the
+	// modules and anchors verification locally. Falling back to the platform
+	// verifier when it is absent is safe: those fail closed where there is no
+	// signature story (Linux) and check the OS signature where there is.
+	verifier := verify.New(log)
+	if *channelDir != "" {
+		v, err := verify.NewChannelFromDir(log, *rootPub, *channelDir)
+		if err != nil {
+			log.Error("channel-anchored verification unavailable", "err", err)
+			os.Exit(1)
+		}
+		verifier = v
+	}
+
 	err := core.Run(ctx, core.Options{
 		StateDir:       *stateDir,
 		ModulesDir:     *modulesDir,
-		Verifier:       verify.New(log),
+		Verifier:       verifier,
 		GateWeaveURL:   *gateweaveURL,
 		PolicyInterval: *policyInterval,
 		ManifestURL:    *manifestURL,
