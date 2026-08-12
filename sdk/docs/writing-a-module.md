@@ -92,11 +92,27 @@ Everything your module needs from the platform comes through `Host`:
 | `Store(ns)` | encrypted key/value, namespaced to your module | you can never reach another module's namespace |
 | `Policy()` | read + watch your policy document | host-delivered policy beats anything local; **watch on a module-lifetime context, not Init's** — Init's context is cancelled the moment Init returns |
 | `Events()` | publish/subscribe bus | topics arrive prefixed with the publisher's id, stamped by core — origins are trustworthy; the only lateral channel between modules |
-| `Transport()` | send/receive via core's authenticated channels | `queueOffline: true` survives a disconnected peer |
+| `Transport()` | send/receive via core's authenticated channels | `queueOffline: true` survives a disconnected peer; see the peers below |
 | `Identity()` | who the device is + module-scoped credentials | you never see private keys |
 | `UI().Declare(...)` | declare surfaces as data | the portal renders; modules never draw |
 | `Schedule(Job)` | recurring work | runs once at Start, then every interval; stops with the module |
 | `Log()` | `*slog.Logger` | captured and attributed by core |
+
+### Transport peers
+
+`Transport()` addresses a **peer**, not a socket, and core owns the connection.
+
+- `PeerGateweave` is the platform's back end.
+- `PeerHypervisor` is the host tooling outside the VM, when your module runs
+  **inside** a guest. Declare the `hypervisor.channel` capability to require it;
+  core will not launch your module on a host that has no such channel.
+
+The hypervisor channel is a single connection core owns on your behalf, so
+messages from several modules share it. Two consequences worth designing for:
+a module that streams (process output, a file) should chunk rather than send one
+enormous message, and inbound delivery is fire-and-forget — if you need a reply
+correlated to a request, carry your own id in the payload. `weaveplatform-agent-
+modules/pkg/guestwire` is a worked example of both.
 
 **Health is a vocabulary, not a boolean.** Report `Degraded` with a reason when a backend
 you need is temporarily absent (no display session yet, device unplugged) — the supervisor
