@@ -177,7 +177,7 @@ stateDiagram-v2
 | `internal/store` | one bbolt file, bucket per namespace, AES-256-GCM per value (namespace+key as AAD), master key sealed by `keyprotect` (DPAPI / keyfile → Secure Enclave/TPM later) |
 | `internal/policy` | fetch from GateWeave, cache in store for offline restarts, wake Watch streams on change |
 | `internal/identity` | Ed25519 device identity behind a Provider seam, enrolment, per-module scoped credentials |
-| `internal/transport` | peer mux (GateWeave HTTP peer; hypervisor channel reserved), durable offline queue |
+| `internal/transport` | peer mux (GateWeave HTTP peer, hypervisor channel), durable offline queue |
 | `internal/lifecycle` | staged install, health-gated promote, N-1 retention, rollback |
 | `internal/manifestverify` | two-tier Ed25519 chain verification for channel manifests |
 | `internal/capability` | the one host probe at startup that gates module launch |
@@ -194,6 +194,30 @@ is added beside it; `v1/` is never deleted. That property — negotiated compati
 continuously proven — is what makes independent module versioning an asset instead of a
 liability.
 
+## The hypervisor channel
+
+Inside a guest, core owns one connection to the host tooling outside it — a
+virtio-serial device, vsock, or HvSocket, whichever the capability probe found.
+Modules never see framing or device nodes: they `Send` and `Receive` messages
+addressed to `PEER_HYPERVISOR`, and core translates.
+
+The framing lives in `weaveplatform-api/hvchannel` rather than here, because the
+host end must encode identically and **nothing on that wire would catch a
+mismatch** — no negotiation, no version exchange, so a field renamed on one side
+just stops matching and the symptom is a guest that never answers.
+
+Core owns exactly one connection because the frame protocol has **no
+resynchronisation**: a second reader desynchronises the stream permanently rather
+than degrading it. One fd, one read loop, one write mutex.
+
+A frame that will not decode costs one message, not the channel — the length
+prefix has already kept the reader aligned, so the loop logs and continues. Only
+a stream-level failure ends it. Getting that classification backwards would let
+one malformed frame silently kill a channel core cannot re-establish, with the
+guest still looking healthy.
+
+`weaveplatform-agent-modules/guestweave-*` is what runs on the other side of it.
+
 ## What is deliberately not here yet
 
 - **Portal (Zone B)** — UI surfaces are already declared as data and brokered through
@@ -201,5 +225,5 @@ liability.
 - **Zone C** (System Extensions, cgo) — the capability probe and manifest zone field are the
   seams.
 - **GateWeave** — `test/stubgateweave` defines the contract core programs against.
-- **Hypervisor channel** — `transport.Peer` is the seam; virtio-serial/HvSocket arrive with
-  the guestweave consolidation, along with per-user session supervision.
+- **Per-user session supervision** — the supervisor rejects non-`system` sessions today.
+  Clipboard, display and input need it, and it is a second lift on core.
