@@ -28,11 +28,15 @@ first time any of this has run in a VM rather than in a loopback test.
 
 ### Note on this release
 
-Cut by hand. GitHub Actions is unavailable in this org, so release-please did
-not generate this entry, no CI validated the tag, and **goreleaser did not run**
-— this release has no built artifacts: no archives, no .deb, no checksums file
-and no cosign signature. The packaging it adds has only ever been exercised
-locally, via `goreleaser release --snapshot`.
+The tag was cut by hand rather than by release-please, which could not run at the
+time. The artifacts are real: goreleaser built the archives, both `.deb`
+packages and the cosign-signed checksums once CI was available again, and the
+Debian package was verified to install and start core in a guest.
+
+`go-test` fails on windows-latest in `internal/hostserv` and `test/protocompat`
+— unix socket paths and an unknown network "winpipe". Both predate this release
+and are in packages it does not touch; it is the first time those tests have
+executed on Windows at all. macOS and Linux pass.
 
 ## [0.1.1](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.1.0...v0.1.1) (2026-08-10)
 
