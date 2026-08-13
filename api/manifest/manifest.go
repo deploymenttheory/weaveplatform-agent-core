@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+
+	"github.com/deploymenttheory/weaveplatform-api/hvchannel"
 )
 
 // Privilege levels a manifest may declare. Not every module is root.
@@ -103,6 +105,14 @@ func (m *Manifest) Validate() error {
 		return fmt.Errorf("manifest: unsupported schema %d", m.Schema)
 	case !idRe.MatchString(m.ID):
 		return fmt.Errorf("manifest: invalid id %q", m.ID)
+	case m.ID == hvchannel.ControlModule:
+		// The hypervisor channel addresses its own control frames — the
+		// authentication handshake — to this id, and core intercepts them
+		// before delivery. A module published under this name would receive
+		// nothing and merely look broken; worse, a module in a position to
+		// answer for the channel could answer the handshake. Refuse it here,
+		// where the publisher finds out, rather than inside a guest.
+		return fmt.Errorf("manifest: id %q is reserved for hypervisor channel control frames", m.ID)
 	case !versionRe.MatchString(m.Version):
 		return fmt.Errorf("manifest: invalid version %q", m.Version)
 	case m.Protocol < 1:
