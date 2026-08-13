@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.1.1...v0.2.0) (2026-08-13)
+
+Core now installs into a Linux guest from a signed apt repository, starts under
+systemd, finds its hypervisor channel, verifies and launches the guestweave
+module, and refuses to be driven by a host that cannot prove it holds the VM's
+key. Verified on a real Debian 12 arm64 guest, with nobody touching it — the
+first time any of this has run in a VM rather than in a loopback test.
+
+
+### Features
+
+* **packaging:** ship core as a signed .deb from a signed apt repository, with a systemd unit, an apt repository builder and a cloud-init seed ([9de57fb](https://github.com/deploymenttheory/weaveplatform-agent/commit/9de57fbf01cec6bde382e5e2c691e83deaf3643a))
+* **transport:** fail closed until the host proves it holds the VM's key, in both directions ([7a8bb5e](https://github.com/deploymenttheory/weaveplatform-agent/commit/7a8bb5e25704a3ea5a5ae6d2c2a5b4ff0cca4552))
+
+
+### Bug Fixes
+
+* **capability:** identify the hypervisor channel by port name, not by node. The probe claimed the capability from a bare /dev/vsock, which every weave guest has — core would open a device that never delivers a frame while every log line read healthy ([eeb10c3](https://github.com/deploymenttheory/weaveplatform-agent/commit/eeb10c302998feefeebfc40838c2e53f65b69e74))
+* **weaveboot:** create the core state directory before launching core, so a fresh package install can write its readiness marker. Without it, crash-loop revert silently degraded to judging a core by uptime alone ([e91fe71](https://github.com/deploymenttheory/weaveplatform-agent/commit/e91fe71b6350a56b72e2e31ac1d2fc8994e6924e))
+
+
+### Note on this release
+
+Cut by hand. GitHub Actions is unavailable in this org, so release-please did
+not generate this entry, no CI validated the tag, and **goreleaser did not run**
+— this release has no built artifacts: no archives, no .deb, no checksums file
+and no cosign signature. The packaging it adds has only ever been exercised
+locally, via `goreleaser release --snapshot`.
+
 ## [0.1.1](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.1.0...v0.1.1) (2026-08-10)
 
 
