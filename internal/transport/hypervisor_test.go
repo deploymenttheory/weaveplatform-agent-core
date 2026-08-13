@@ -25,7 +25,7 @@ func TestHypervisorLoopback(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mux.Hypervisor = newHypervisorPeer(ctx, guestConn, log, mux.deliver)
+	mux.Hypervisor = newHypervisorPeer(ctx, guestConn, log, mux.deliver, authenticatedForTest())
 
 	// A module subscribes to inbound messages.
 	in := mux.Receive(ctx, "guestweave")
@@ -94,7 +94,7 @@ func TestUndecodableFrameDoesNotKillTheChannel(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	mux.Hypervisor = newHypervisorPeer(ctx, guestConn, log, mux.deliver)
+	mux.Hypervisor = newHypervisorPeer(ctx, guestConn, log, mux.deliver, authenticatedForTest())
 	in := mux.Receive(ctx, "guestweave")
 
 	hostW := bufio.NewWriter(hostConn)

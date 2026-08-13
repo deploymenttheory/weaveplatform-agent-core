@@ -19,3 +19,9 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )
+
+// TEMPORARY: the hypervisor channel's authentication handshake lives in
+// weaveplatform-api's hvchannel package and is not in the published v0.8.0. Until
+// that repo is tagged, a sibling checkout is the only way to build against it.
+// Delete this line and pin the release once it exists.
+replace github.com/deploymenttheory/weaveplatform-api => ../weaveplatform-api
