@@ -201,6 +201,16 @@ virtio-serial device, vsock, or HvSocket, whichever the capability probe found.
 Modules never see framing or device nodes: they `Send` and `Receive` messages
 addressed to `PEER_HYPERVISOR`, and core translates.
 
+The probe identifies that device **by the port name the host publishes**
+(`org.weave.agent.0`), never by node position. A virtio-serial port has no other
+distinguishing feature, and the numbering moves with however many other console
+ports the host configured. On Linux that means the udev symlink under
+`/dev/virtio-ports/`, or — on a guest with no udev — the sysfs entry that carries
+the same name. Nothing else counts: `/dev/vsock` in particular is present in
+every weave guest for unrelated reasons, and claiming the channel on it gives
+core a device that opens successfully and then delivers nothing, which is the
+worst failure available because every log line still reads healthy.
+
 The framing lives in `weaveplatform-api/hvchannel` rather than here, because the
 host end must encode identically and **nothing on that wire would catch a
 mismatch** — no negotiation, no version exchange, so a field renamed on one side
@@ -215,6 +225,39 @@ prefix has already kept the reader aligned, so the loop logs and continues. Only
 a stream-level failure ends it. Getting that classification backwards would let
 one malformed frame silently kill a channel core cannot re-establish, with the
 guest still looking healthy.
+
+### Authentication
+
+Anything on the host that can reach the channel can drive the guest — power it
+off, run a command in it, read its inventory — so the channel authenticates its
+peer before honouring any of that. Without it the boundary is "whoever got to the
+file descriptor first", which is not a boundary.
+
+The guest holds an Ed25519 public key placed in its image at build time
+(`/etc/weave/channel.pub`, or `--channel-pub`); the host holds the private half in
+the VM's directory. The guest issues a single-use nonce, the host signs it, the
+guest checks the signature against the key it already trusts. The frames and the
+signing message live in `weaveplatform-api/hvchannel` for the same reason the
+framing does: both ends must build them identically and nothing on this wire would
+catch a mismatch.
+
+Scope is **per VM**, not per host. A process able to drive VM A therefore cannot
+drive VM B, which one host-wide key would have allowed the moment it leaked.
+
+It **fails closed**, in both directions. An unauthenticated peer is refused every
+operation, and a module's unsolicited output is not sent to one either — an
+attacker who cannot ask a question but can read every answer has most of what they
+wanted. A guest with no key file authenticates nobody, which is the right answer
+for an unprovisioned image.
+
+Two things cross an unauthenticated channel, deliberately: the handshake, and the
+guestweave module's `presence.hello`. That exemption is what lets a caller tell
+"wrong key" from "no agent here" — two situations needing completely different
+responses from an operator, which a channel that answered nothing would make
+identical. Neither discloses more than the channel's existence already does.
+
+A refusal is sent, not merely logged. Silence would leave the caller waiting out a
+timeout indistinguishable from a guest that is not there.
 
 `weaveplatform-agent-modules/guestweave-*` is what runs on the other side of it.
 
