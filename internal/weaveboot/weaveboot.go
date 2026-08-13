@@ -70,6 +70,16 @@ func Run(ctx context.Context, o Options) error {
 	}
 
 	readyFile := filepath.Join(o.CoreDir, "ready")
+	// A package install lays down binaries, not state, so on a guest's first boot
+	// CoreDir does not exist yet — and core writes its readiness marker via a
+	// temp file in that directory, which then fails with ENOENT. Nothing breaks
+	// loudly: the marker is simply never written, markerFresh is never true, and
+	// weaveboot silently falls back to judging a core by uptime alone. That
+	// weakens the crash-loop revert exactly on the installs most likely to need
+	// it. Create it here, where CoreDir is owned.
+	if err := os.MkdirAll(o.CoreDir, 0o700); err != nil {
+		return fmt.Errorf("weaveboot: preparing %s: %w", o.CoreDir, err)
+	}
 
 	crashes := 0
 	for ctx.Err() == nil {

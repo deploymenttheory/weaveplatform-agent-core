@@ -54,7 +54,17 @@ func TestLinuxVerifierChecksTheContainingDirectory(t *testing.T) {
 func TestLinuxVerifierRefusesWorldWritableBinary(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "guestweave")
-	if err := os.WriteFile(path, []byte("module"), 0o777); err != nil {
+	if err := os.WriteFile(path, []byte("module"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// Chmod explicitly: WriteFile's mode is filtered by the process umask, which
+	// is 0022 in most environments, so the file would arrive 0755 and this test
+	// would assert nothing. It still passed everywhere it was run, because those
+	// runs were unprivileged and the verifier refused on OWNERSHIP before it ever
+	// looked at the mode — so the mode branch has never actually been exercised
+	// by this test until now. Core runs as root in production, where ownership
+	// passes and the mode check is the only thing left.
+	if err := os.Chmod(path, 0o777); err != nil {
 		t.Fatal(err)
 	}
 

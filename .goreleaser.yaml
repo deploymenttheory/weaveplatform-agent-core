@@ -75,6 +75,65 @@ archives:
       - LICENSE
       - spec.md
 
+# The Debian package. Linux has no exec-time signature construct, so the package
+# manager IS the trust mechanism there: a signed .deb from a GPG-signed repository,
+# with dpkg verifying provenance at install (internal/verify/release_linux.go says
+# the rest). That is why this exists as a package rather than a tarball and an
+# install script.
+nfpms:
+  - id: weave-agent
+    package_name: weave-agent
+    ids: [weave-agent, weaveboot, weavectl]
+    formats: [deb]
+    file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Arch }}"
+    maintainer: Deployment Theory <support@deploymenttheory.com>
+    description: |
+      Weave platform agent.
+      The one supervised, policied, authenticated presence on a machine:
+      weaveboot supervising core, core supervising modules.
+    vendor: Deployment Theory
+    homepage: https://github.com/deploymenttheory/weaveplatform-agent
+    license: MIT
+    section: admin
+    priority: optional
+
+    # All three binaries land in one directory, not /usr/bin. weaveboot resolves
+    # core as "the binary beside me" when no staged version layout exists
+    # (weaveboot.currentBinary), which is exactly the fresh-install case — so the
+    # two must be siblings. weavectl is reached through the symlink below.
+    bindir: /usr/lib/weave
+
+    contents:
+      - src: packaging/linux/weave-agent.service
+        dst: /lib/systemd/system/weave-agent.service
+        type: config
+      - src: /usr/lib/weave/weavectl
+        dst: /usr/bin/weavectl
+        type: symlink
+      # Created by the package so its ownership and mode are dpkg's statement,
+      # not a guess made at runtime: release_linux.go refuses to exec a module
+      # from a directory anyone but root can write.
+      - dst: /usr/lib/weave/modules
+        type: dir
+        file_info:
+          mode: 0755
+          owner: root
+          group: root
+
+    scripts:
+      postinstall: packaging/linux/postinstall.sh
+      preremove: packaging/linux/preremove.sh
+      postremove: packaging/linux/postremove.sh
+
+    deb:
+      # A `_gpgorigin` signature inside the .deb, when a key is configured. It is
+      # belt-and-braces: what apt actually verifies is the repository's signed
+      # Release file (packaging/apt), because that is what binds a package to a
+      # publisher at fetch time. Left empty, the package is unsigned and the
+      # repository signature carries the trust on its own.
+      signature:
+        key_file: '{{ index .Env "WEAVE_DEB_SIGN_KEY" }}'
+
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
   algorithm: sha256

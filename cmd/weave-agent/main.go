@@ -28,6 +28,8 @@ func main() {
 		"path to the manifest root public key (dev/self-hosted)")
 	channelDir := flag.String("channel-dir", os.Getenv("WEAVE_CHANNEL_DIR"),
 		"directory holding a signed channel-manifest bundle to verify modules against (offline installs)")
+	channelPub := flag.String("channel-pub", os.Getenv("WEAVE_CHANNEL_PUB"),
+		"path to the public key a host must prove possession of to drive this guest over the hypervisor channel (default: the platform path)")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
 
@@ -64,6 +66,7 @@ func main() {
 		PolicyInterval: *policyInterval,
 		ManifestURL:    *manifestURL,
 		RootPubPath:    *rootPub,
+		ChannelPubPath: *channelPub,
 		Log:            log,
 	})
 	if err != nil {

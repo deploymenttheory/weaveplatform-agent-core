@@ -57,7 +57,12 @@ type Options struct {
 	// RootPubPath loads the manifest root public key from a file (dev/
 	// self-hosted); release packaging embeds it instead.
 	RootPubPath string
-	Log         *slog.Logger
+	// ChannelPubPath is the Ed25519 public key a host must prove possession
+	// of before it may drive this guest over the hypervisor channel. Empty
+	// takes the platform default (transport.DefaultChannelKeyPath), which is
+	// where a guest image provisions it.
+	ChannelPubPath string
+	Log            *slog.Logger
 }
 
 // Run starts core and blocks until ctx ends.
@@ -145,7 +150,7 @@ func Run(ctx context.Context, opts Options) error {
 	// modules address PEER_HYPERVISOR and never touch the wire. Runs for the
 	// core lifetime.
 	if attrs, ok := caps["hypervisor.channel"]; ok {
-		if err := mux.ConnectHypervisor(ctx, attrs); err != nil {
+		if err := mux.ConnectHypervisor(ctx, attrs, opts.ChannelPubPath); err != nil {
 			log.Warn("hypervisor channel present but could not connect", "err", err)
 		} else {
 			log.Info("hypervisor channel connected", "device", attrs["device"])
