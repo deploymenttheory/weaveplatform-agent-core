@@ -28,21 +28,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # weaveplatform-api is a private module; CI needs a token that can
-      # read org repos. Add a fine-grained PAT (contents:read on
-      # deploymenttheory/weaveplatform-api) as the GOMODULES_TOKEN secret.
-      - name: Configure private module access
-        env:
-          TOKEN: ${{ secrets.GOMODULES_TOKEN }}
-        shell: bash
-        run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::GOMODULES_TOKEN secret is not set — required to fetch private weaveplatform-api"
-            exit 1
-          fi
-          git config --global url."https://x-access-token:${TOKEN}@github.com/deploymenttheory/".insteadOf "https://github.com/deploymenttheory/"
-          echo "GOPRIVATE=github.com/deploymenttheory/*" >> "$GITHUB_ENV"
-
       - name: Test
         env:
           CGO_ENABLED: "0"
@@ -76,18 +61,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-
-      - name: Configure private module access
-        env:
-          TOKEN: ${{ secrets.GOMODULES_TOKEN }}
-        shell: bash
-        run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::GOMODULES_TOKEN secret is not set — required to fetch private weaveplatform-api"
-            exit 1
-          fi
-          git config --global url."https://x-access-token:${TOKEN}@github.com/deploymenttheory/".insteadOf "https://github.com/deploymenttheory/"
-          echo "GOPRIVATE=github.com/deploymenttheory/*" >> "$GITHUB_ENV"
 
       - name: Test (-race)
         env:
