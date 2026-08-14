@@ -16,6 +16,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
 )
 
 // Environment variables core sets before exec'ing a module.
@@ -33,6 +35,11 @@ const (
 	EnvSocketDir = "WEAVE_SOCKET_DIR"
 	// Config is NOT an env var: it rides InitRequest.Config on the wire.
 )
+
+// legacyNetworkPipe is the pre-v0.3 spelling of ipc.NetworkPipe. Modules built
+// against those SDKs still print it, and they are protocol-1 modules that core
+// promises to run — so Parse accepts it and normalises. Nothing writes it.
+const legacyNetworkPipe = "winpipe"
 
 // LineVersion is the handshake format version — the leading field of the
 // stdout line, distinct from the protocol integer that follows it.
@@ -77,13 +84,23 @@ func Parse(s string) (Line, error) {
 	if err != nil || p == 0 {
 		return Line{}, fmt.Errorf("handshake: bad protocol %q", parts[2])
 	}
-	if parts[3] != "unix" && parts[3] != "npipe" {
+	network := parts[3]
+	// "winpipe" is what this field was called before the rename to "npipe", and
+	// it is still what a module built against an SDK older than v0.3 prints.
+	// Refusing it broke the protocol-1 promise on Windows only — the unix token
+	// never changed, so every unix guest kept working and nothing showed it.
+	// Accept the old spelling and normalise; the alias costs one comparison and
+	// buys compatibility with every module already built.
+	if network == legacyNetworkPipe {
+		network = ipc.NetworkPipe
+	}
+	if network != ipc.NetworkUnix && network != ipc.NetworkPipe {
 		return Line{}, fmt.Errorf("handshake: unknown network %q", parts[3])
 	}
 	if parts[4] == "" {
 		return Line{}, fmt.Errorf("handshake: empty address")
 	}
-	return Line{Protocol: uint32(p), Network: parts[3], Addr: parts[4]}, nil
+	return Line{Protocol: uint32(p), Network: network, Addr: parts[4]}, nil
 }
 
 // Window is core's advertised protocol range as read from (or written to)

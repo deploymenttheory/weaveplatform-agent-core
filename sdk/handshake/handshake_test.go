@@ -1,6 +1,10 @@
 package handshake
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
+)
 
 func TestLineRoundTrip(t *testing.T) {
 	l := Line{Protocol: 3, Network: "unix", Addr: "/var/run/weave/sysinfo.sock"}
@@ -45,5 +49,33 @@ func TestWindow(t *testing.T) {
 	}
 	if _, err := ParseWindow("3", "2"); err == nil {
 		t.Error("inverted window accepted")
+	}
+}
+
+// A module built against an SDK older than v0.3 prints "winpipe" where current
+// ones print "npipe". Those are protocol-1 modules, which core promises to run,
+// so the rename must not lock them out.
+//
+// This broke on Windows only — the unix token never changed, so every unix guest
+// kept working and nothing showed it. It surfaced the first time the
+// compatibility suite ran on a Windows runner.
+func TestParseAcceptsTheLegacyPipeNetworkName(t *testing.T) {
+	line, err := Parse(`WEAVE|1|1|winpipe|\\.\pipe\weave-module-x`)
+	if err != nil {
+		t.Fatalf("a module built against an older SDK was refused: %v", err)
+	}
+	// Normalised, so nothing downstream has to know two spellings.
+	if line.Network != ipc.NetworkPipe {
+		t.Errorf("network = %q, want %q", line.Network, ipc.NetworkPipe)
+	}
+	if line.Addr != `\\.\pipe\weave-module-x` {
+		t.Errorf("addr = %q", line.Addr)
+	}
+}
+
+// The alias is exactly one name, not a general loosening.
+func TestParseStillRefusesAnUnknownNetwork(t *testing.T) {
+	if _, err := Parse(`WEAVE|1|1|tcp|127.0.0.1:9000`); err == nil {
+		t.Fatal("an unknown network was accepted")
 	}
 }
