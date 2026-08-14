@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -39,7 +40,15 @@ func serve(t *testing.T, module, token string, subscribes []string) *grpc.Client
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
+	// A socket path on unix, a pipe name on Windows — the same split
+	// supervise.launch makes for a real module. ipc.Listen is a named-pipe
+	// listener on Windows, and hands a filesystem path straight to CreateFile,
+	// which fails with "Incorrect function": a test that skipped this was
+	// testing an address production never uses.
 	addr := filepath.Join(dir, "h.sock")
+	if runtime.GOOS == "windows" {
+		addr = `\\.\pipe\weave-hostserv-test-` + filepath.Base(dir)
+	}
 	lis, err := ipc.Listen(addr)
 	if err != nil {
 		t.Fatal(err)
