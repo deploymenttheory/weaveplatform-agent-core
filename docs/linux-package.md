@@ -84,9 +84,8 @@ than guessing.
 boot, with nobody touching the guest:
 
 ```sh
-./packaging/cloudinit/make-seed.sh http://192.168.64.1:8000/ \
+./packaging/cloudinit/make-seed.sh agent-test http://192.168.64.1:8000/ \
     ~/.weave/bringup/repo/weave-archive-keyring.asc \
-    ~/.weave/vms/agent-test/channel.pub \
     ~/.weave/bringup/seed.iso
 
 weave run agent-test --mount ~/.weave/bringup/seed.iso --no-graphics
@@ -94,8 +93,13 @@ weave run agent-test --mount ~/.weave/bringup/seed.iso --no-graphics
 
 Two keys, two jobs: the **archive key** is what apt checks to trust the packages;
 the **channel key** is what the guest checks to decide whether the host may command
-it afterwards (see `architecture.md`). Neither substitutes for the other, and the
-seed refuses to build without both.
+it afterwards (see `architecture.md`). Neither substitutes for the other.
+
+You name the VM, not its channel key. Weave mints that key when the VM is created
+or cloned, so the seed builder reads it from the VM's own directory — passing it by
+hand would mean hand-carrying a credential the tooling already knows how to find,
+where a wrong path yields a guest that installs cleanly and then refuses every
+command. A VM with no key is an error, not a seed built without one.
 
 ### Things that will waste an afternoon
 
