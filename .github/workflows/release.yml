@@ -36,18 +36,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # weaveplatform-api and -sdk are private modules.
-      - name: Configure private module access
-        env:
-          TOKEN: ${{ secrets.GOMODULES_TOKEN }}
-        run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::GOMODULES_TOKEN secret is not set — required to fetch private weaveplatform modules"
-            exit 1
-          fi
-          git config --global url."https://x-access-token:${TOKEN}@github.com/deploymenttheory/".insteadOf "https://github.com/deploymenttheory/"
-          echo "GOPRIVATE=github.com/deploymenttheory/*" >> "$GITHUB_ENV"
-
       - uses: sigstore/cosign-installer@v3
 
       # Release builds must be production builds: the `dev` build tag turns
