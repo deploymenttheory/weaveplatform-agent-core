@@ -8,8 +8,8 @@ github.com/deploymenttheory/go-bindings-win32 v0.2.1 h1:mApZJdaGj636R5lLwSPIIdA+
 github.com/deploymenttheory/go-bindings-win32 v0.2.1/go.mod h1:UCwSCOc2LcmtnGEQFuhyDZ9pFjMdpxvOhR4MsjOji94=
 github.com/deploymenttheory/weaveplatform-api v0.9.0 h1:vkqYGcUB9+/Mm6d4Jy3kdc1r1Ssdy7RCkVqqIqb+1m4=
 github.com/deploymenttheory/weaveplatform-api v0.9.0/go.mod h1:IUTPlHlygStaXvFEsihWddnTeFuaMVoblo1PV0udUoM=
-github.com/deploymenttheory/weaveplatform-sdk v0.6.0 h1:harppaFzwrXePaPW/Ir4VihRRULDSmCepJme87yyCkM=
-github.com/deploymenttheory/weaveplatform-sdk v0.6.0/go.mod h1:1oXagZ47RbGlrcLj2432L/ctn8pHt+hEekgpr+WJWjE=
+github.com/deploymenttheory/weaveplatform-sdk v0.6.1 h1:fwWPYmkwIUSJhJVYHIpuR+HdWa83BjE9LRoV+HKOFPY=
+github.com/deploymenttheory/weaveplatform-sdk v0.6.1/go.mod h1:1oXagZ47RbGlrcLj2432L/ctn8pHt+hEekgpr+WJWjE=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
 github.com/go-logr/logr v1.4.3/go.mod h1:9T104GzyrTigFIr8wt5mBrctHMim0Nb2HLGrmQ40KvY=
 github.com/go-logr/stdr v1.2.2 h1:hSWxHoqTgW2S2qGc0LTAI563KZ5YKYRhT3MFKZMbjag=
