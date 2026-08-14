@@ -1,15 +1,19 @@
 #!/bin/sh
 # Build a NoCloud seed ISO that installs the agent at first boot.
 #
-#   ./packaging/cloudinit/make-seed.sh <repo-url> <archive-key> <channel-pub> [out.iso]
+#   ./packaging/cloudinit/make-seed.sh <vm> <repo-url> <archive-key> [out.iso]
 #
-# e.g. ./packaging/cloudinit/make-seed.sh http://192.168.64.1:8000/ \
-#          ~/.weave/bringup/repo/weave-archive-keyring.asc \
-#          ~/.weave/vms/agent-test/channel.pub ~/.weave/bringup/seed.iso
+# e.g. ./packaging/cloudinit/make-seed.sh scratch http://192.168.64.1:8000/ \
+#          ~/.weave/bringup/repo/weave-archive-keyring.asc
 #
 # Two different keys, doing two different jobs. The archive key is what apt checks
 # to trust the packages; the channel key is what the guest checks to decide whether
 # the host may command it afterwards. Neither substitutes for the other.
+#
+# You name the VM, not its channel key. The key belongs to the VM — weave mints it
+# at create or clone — so asking an operator to locate and pass it would be asking
+# them to hand-carry a credential the tooling already knows where to find, with a
+# wrong path silently producing a guest that refuses every command.
 #
 # Attach it with: weave run <vm> --mount seed.iso
 #
@@ -18,21 +22,28 @@
 # keystrokes that has to hit the same pixels twice.
 set -eu
 
-REPO_URL="${1:-}"
-KEY_FILE="${2:-}"
-CHANNEL_PUB="${3:-}"
+VM="${1:-}"
+REPO_URL="${2:-}"
+KEY_FILE="${3:-}"
 OUT="${4:-$HOME/.weave/bringup/seed.iso}"
+
+# Where weave keeps its VMs. WEAVE_HOME overrides, matching the CLI.
+CHANNEL_PUB="${WEAVE_HOME:-$HOME/.weave}/vms/$VM/channel.pub"
 HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
-if [ -z "$REPO_URL" ] || [ -z "$KEY_FILE" ] || [ -z "$CHANNEL_PUB" ]; then
-	echo "usage: $0 <repo-url> <archive-key> <channel-pub> [out.iso]" >&2
+if [ -z "$VM" ] || [ -z "$REPO_URL" ] || [ -z "$KEY_FILE" ]; then
+	echo "usage: $0 <vm> <repo-url> <archive-key> [out.iso]" >&2
 	exit 2
 fi
 [ -f "$KEY_FILE" ] || { echo "no such archive key: $KEY_FILE" >&2; exit 1; }
-# Required, not optional. A seed that quietly omitted it would build a guest that
-# looks healthy and refuses every command, which is a much worse afternoon than a
-# seed that refuses to build.
-[ -f "$CHANNEL_PUB" ] || { echo "no such channel public key: $CHANNEL_PUB" >&2; exit 1; }
+# Required, not optional. A seed that quietly omitted the channel key would build a
+# guest that looks healthy and refuses every command — a much worse afternoon than
+# a seed that refuses to build.
+if [ ! -f "$CHANNEL_PUB" ]; then
+	echo "VM \"$VM\" has no channel key at $CHANNEL_PUB" >&2
+	echo "  weave mints one at create and clone; \`weave run $VM\` backfills an older VM." >&2
+	exit 1
+fi
 
 SEED="$(dirname "$OUT")/seed"
 rm -rf "$SEED"
@@ -72,4 +83,5 @@ hdiutil makehybrid -iso -joliet -default-volume-name CIDATA -o "$OUT" "$SEED" >/
 echo "$OUT"
 echo "  instance-id: $INSTANCE_ID"
 echo "  repo:        $REPO_URL"
+echo "  vm:          $VM"
 echo "  channel key: $CHANNEL_PUB"
