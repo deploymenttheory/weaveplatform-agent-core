@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.2.0...v0.2.1) (2026-08-14)
+
+
+### Bug Fixes
+
+* **test:** give hostserv a Windows address, and pin the handshake fix ([9f1e31d](https://github.com/deploymenttheory/weaveplatform-agent/commit/9f1e31d3866a06f3c20519f33e170d51e11c5641))
+* **test:** give hostserv a Windows address, and pin the handshake fix ([6f3f427](https://github.com/deploymenttheory/weaveplatform-agent/commit/6f3f4273df68c33991417bcaaef6d21aae81540f))
+
 ## [0.2.0](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.1.1...v0.2.0) (2026-08-13)
 
 Core now installs into a Linux guest from a signed apt repository, starts under
