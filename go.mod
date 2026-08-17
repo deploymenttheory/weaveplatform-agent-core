@@ -8,7 +8,7 @@ require (
 	github.com/deploymenttheory/weaveplatform-sdk v0.6.1
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/sys v0.47.0
-	golang.org/x/term v0.43.0
+	golang.org/x/term v0.45.0
 	google.golang.org/grpc v1.83.0
 )
 
