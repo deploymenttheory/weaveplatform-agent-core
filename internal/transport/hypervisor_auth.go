@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/deploymenttheory/weaveplatform-api/hvchannel"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/hvchannel"
 )
 
 // The guest end of channel authentication.
@@ -20,7 +20,7 @@ import (
 // command in it, read its addresses — so the question "who is on the other end"
 // has to be answered before any of it is honoured. The guest holds a public key
 // placed in its image at build time; the host holds the private half in the VM's
-// directory. See weaveplatform-api/hvchannel for the handshake and why the key is
+// directory. See sdk/hvchannel for the handshake and why the key is
 // per VM rather than per host.
 //
 // Fail closed. A guest with no key file authenticates nobody and answers nothing

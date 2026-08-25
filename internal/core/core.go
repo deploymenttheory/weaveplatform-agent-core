@@ -26,8 +26,8 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/transport"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/version"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
-	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
 )
 
 // Window is the protocol range this core accepts. Protocol 1 is current;

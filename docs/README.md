@@ -7,8 +7,9 @@
   (with diagrams).
 - [`development.md`](development.md) — local setup, running the agent, testing, CI and the
   release pipeline.
-- [`../pkg/README.md`](../pkg/README.md) — the immutable install footprint per platform.
-- [PROTOCOL.md](https://github.com/deploymenttheory/weaveplatform-api/blob/main/PROTOCOL.md)
-  (weaveplatform-api) — what the protocol integer is and what bumps it.
-- [Writing a module](https://github.com/deploymenttheory/weaveplatform-sdk/blob/main/docs/writing-a-module.md)
-  (weaveplatform-sdk) — the module author's guide.
+- [`PROTOCOL.md`](PROTOCOL.md) — what the protocol integer is and what bumps it; the
+  handshake; the N-2 window.
+- [`services.md`](services.md) — the gRPC service map: who serves what, on which socket.
+- [`../sdk/docs/writing-a-module.md`](../sdk/docs/writing-a-module.md) — the module author's
+  guide.
+- [`linux-package.md`](linux-package.md) — the deb, the apt repository and the cloud-init seed.

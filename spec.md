@@ -157,7 +157,7 @@ site. This turns a panic on an unbound symbol from a field incident into a start
 WinUI leak into every module and Zone B stops being a boundary.
 
 **`Platform()` is absent from `Host` deliberately.** OS bindings are syscall and purego surfaces and
-cannot cross a wire. Each module links `weaveplatform-sdk/platform` itself.
+cannot cross a wire. Each module links `sdk/platform` itself.
 
 ---
 
@@ -229,23 +229,34 @@ staged, health-gated, with rollback. Image-baked core is the VM special case, no
 ## 10. Layout
 
 ```
-weaveplatform-api            contracts: proto, openapi, events, shared schemas, generated Go
-weaveplatform-sdk            errors, log, config, retry, platform seam, module scaffolding
-weaveplatform-agent          weaveboot, core, cli, portal, template, packaging
-weaveplatform-manifest       signed channel manifests, signing chain
-
-weaveplatform-agent-modules  the modules monorepo — one Go module per directory, each
-                             versioned and released on its product's train (<module>/vX.Y.Z
-                             tags, one go.mod per module)
+weaveplatform-agent          one repository, two Go modules:
+  .                          core — weaveboot, weave-agent, weavectl, weavemanifest, packaging
+  sdk/                       what a module builds against: proto contracts and generated Go,
+                             manifest types, hvchannel, modulesdk, handshake, ipc, platform seam
+  proto/ schema/             the sources sdk/gen and the manifest types are derived from
+  modules/sysinfo            the platform's own module and the template
+<product>                    one repository per product (guestweave, deviceweave, …) holding
+                             that product's module, its wire vocabulary and — when it has
+                             one — its host-side tooling; released through the reusable
+                             module pipeline this repository publishes
+weaveplatform-channels       signed channel manifests and the signing keys; data, not code
 ```
 
-Dependency direction is one-way and enforced by repository (and go.mod) boundary:
+The sdk is a nested Go module, tagged `sdk/vX.Y.Z`, for exactly one reason: every module
+pins it, and a module must be able to build against `sdk/v0.7` while core is at `v0.9`. It is
+not a separate repository because the boundary bought nothing and one engineer paid for it
+on every change. **A package in `sdk/` with no consumer outside core moves to `internal/`.**
+
+Dependency direction is one-way. Core → sdk is enforced by go.mod: core `replace`s the sdk
+to `./sdk`, so it always builds against the tree it ships with. Sdk ↛ core is *not* a compile
+error any more — Go's `internal/` rule is path-based and `sdk/` sits inside this module's
+path — so CI checks it (`go-test.yml`, job `boundary`). Modules → sdk only.
 
 ```
-weaveplatform-api  ←  weaveplatform-sdk  ←  weaveplatform-agent
-                                        ←  weaveplatform-agent-modules/<module>
-go-bindings-*      ←  weaveplatform-sdk/platform   (the platform seam wraps the bindings)
-go-bindings-*      ←  weaveplatform-agent-modules/<module>   (product-specific APIs, directly)
+sdk  ←  core               (same repository; replace => ./sdk)
+sdk  ←  <product>/module   (by version: sdk/vX.Y.Z)
+go-bindings-*  ←  sdk/platform      (the platform seam wraps the bindings)
+go-bindings-*  ←  <product>/module  (product-specific APIs, directly)
 ```
 
 Either way the `go-bindings-*` versions are pinned by the protocol (§6), recorded in the

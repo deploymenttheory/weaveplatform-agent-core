@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-api/hvchannel"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/hvchannel"
 )
 
 // TestHypervisorLoopback drives the whole channel over an in-process pipe: a

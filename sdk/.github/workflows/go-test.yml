@@ -1,0 +1,68 @@
+name: go-test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Harden Runner
+        if: runner.os == 'Linux'
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        env:
+          CGO_ENABLED: "0"
+        run: go test ./...
+
+      # No committed go.work in CI: build resolves against go.mod pins as a
+      # consumer would. GOWORK=off makes that explicit so a local workspace
+      # can never mask a stale cross-repo pin.
+      - name: Build (GOWORK=off)
+        env:
+          CGO_ENABLED: "0"
+          GOWORK: "off"
+        run: go build ./...
+
+  race:
+    # Race detector needs cgo; run it where a C toolchain is reliable.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Harden Runner
+        if: runner.os == 'Linux'
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test (-race)
+        env:
+          CGO_ENABLED: "1"
+        run: go test -race ./...

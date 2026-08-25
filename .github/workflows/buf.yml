@@ -1,0 +1,68 @@
+name: buf
+
+# The .proto sources live at the repo root; generation targets sdk/gen/go, and
+# the generated Go is committed because a nested module must carry its own
+# .pb.go for `go get` to work. Drift between the two is the failure this job
+# exists to catch.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  buf:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: sdk/go.mod
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      # Pinned to the versions stamped in the committed gen/ headers; @latest
+      # would make the drift check fail on a plugin release rather than on a
+      # proto change.
+      - name: Install protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.1
+
+      - name: Lint
+        run: buf lint
+
+      # Only meaningful once the base branch carries buf.yaml; on the PR that
+      # introduced it there is nothing to compare against.
+      - name: Breaking (against main)
+        if: github.event_name == 'pull_request'
+        run: |
+          if git cat-file -e "origin/${{ github.base_ref }}:buf.yaml" 2>/dev/null; then
+            buf breaking --against ".git#branch=${{ github.base_ref }}"
+          else
+            echo "base branch has no buf.yaml yet; skipping breaking check"
+          fi
+
+      - name: Generate and check drift
+        run: |
+          buf generate
+          git diff --exit-code sdk/gen || {
+            echo "::error::sdk/gen drifted from proto sources — run 'buf generate' and commit"
+            exit 1
+          }
+
+      - name: Build sdk
+        working-directory: sdk
+        run: go build ./...

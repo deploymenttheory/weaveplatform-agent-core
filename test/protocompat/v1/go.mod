@@ -1,6 +1,13 @@
 // Protocol-1 fixture: pinned to the tags that carried protocol 1 so this
 // module builds exactly what a protocol-1 module was, forever. Never
 // delete this directory; when protocol 2 ships, add v2/ beside it.
+//
+// The module paths below are the ORIGINAL repositories (weaveplatform-sdk,
+// weaveplatform-api), which were folded into weaveplatform-agent/sdk after
+// protocol 1 shipped. That is deliberate and doubles as the test that a
+// module built against the old paths still handshakes with the new core.
+// Do not rewrite, tidy or let dependabot bump these; the archived repos and
+// the module proxy keep the tags resolvable.
 module github.com/deploymenttheory/weave-protocompat-v1
 
 go 1.26.5

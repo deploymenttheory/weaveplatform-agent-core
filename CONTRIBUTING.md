@@ -12,5 +12,5 @@ document, and two of its rules gate every change here:
 
 Bugs and proposals: [issues](https://github.com/deploymenttheory/weaveplatform-agent/issues).
 PR titles follow Conventional Commits (enforced by CI). Wire-visible changes to the protocol
-happen in [weaveplatform-api](https://github.com/deploymenttheory/weaveplatform-api), never
-here.
+happen in `proto/` and are gated by `buf breaking` and [`docs/PROTOCOL.md`](docs/PROTOCOL.md);
+the generated Go under `sdk/gen` is committed and CI fails if it drifts.

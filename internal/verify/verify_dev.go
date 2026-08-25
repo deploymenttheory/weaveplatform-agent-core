@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
 )
 
 // newVerifier (dev builds only): accept unsigned binaries, loudly. This

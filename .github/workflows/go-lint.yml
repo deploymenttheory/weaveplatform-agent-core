@@ -16,7 +16,16 @@ permissions:
 
 jobs:
   golint:
-    name: '✨ Run golangci-lint'
+    name: '✨ Run golangci-lint (${{ matrix.module }})'
+    # One job per Go module: golangci-lint stops at a module boundary, so a
+    # single run at the root would never see sdk/. The config stays at the
+    # root so both are held to the same rules.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { module: ".", config: ./.golangci.yml }
+          - { module: sdk, config: ../.golangci.yml }
     runs-on: ubuntu-24.04-arm
 
     steps:
@@ -33,8 +42,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: 'go.mod'
-          cache-dependency-path: 'go.sum'
+          go-version-file: '${{ matrix.module }}/go.mod'
+          cache-dependency-path: '${{ matrix.module }}/go.sum'
           cache: true
           go-version: stable
 
@@ -42,7 +51,8 @@ jobs:
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
         with:
           version: latest
-          args: --timeout=30m --verbose --config=./.golangci.yml --issues-exit-code=0
+          working-directory: ${{ matrix.module }}
+          args: --timeout=30m --verbose --config=${{ matrix.config }} --issues-exit-code=0
           only-new-issues: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           skip-cache: false              # restore and save cache

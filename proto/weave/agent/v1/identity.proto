@@ -1,0 +1,40 @@
+// IdentityService is served by core on the per-module host socket. Core
+// owns the device identity, keypair and enrolment; modules ask who the
+// device is and mint credentials scoped to themselves. Modules never see
+// the device private key.
+
+syntax = "proto3";
+
+package weave.agent.v1;
+
+service IdentityService {
+  rpc WhoAmI(WhoAmIRequest) returns (DeviceIdentity);
+  // Credential mints a token scoped to the calling module. Scope semantics
+  // are owned by GateWeave; core brokers.
+  rpc Credential(CredentialRequest) returns (CredentialResponse);
+}
+
+message WhoAmIRequest {}
+
+message DeviceIdentity {
+  // The platform device id assigned at enrolment. Empty when unenrolled.
+  string device_id = 1;
+  // True when this identity is ephemeral (session-scoped, non-persistent
+  // VM) rather than enrolled.
+  bool ephemeral = 2;
+  // The enrolment tenant/organisation, when enrolled.
+  string tenant = 3;
+}
+
+message CredentialRequest {
+  // Scopes requested, e.g. "telemetry:write". Granted scopes may be fewer.
+  repeated string scopes = 1;
+}
+
+message CredentialResponse {
+  // Opaque bearer token, already scoped to the calling module.
+  string token = 1;
+  // Expiry, Unix seconds. Core refreshes; modules re-request on expiry.
+  int64 expires_at = 2;
+  repeated string granted_scopes = 3;
+}

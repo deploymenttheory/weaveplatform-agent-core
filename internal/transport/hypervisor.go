@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"sync"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-api/hvchannel"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/hvchannel"
 )
 
 // The hypervisor channel is a single byte pipe (virtio-serial / vsock /
@@ -21,7 +21,7 @@ import (
 // One fd, one read loop, one write mutex — always.
 //
 // The framing and addressing format itself lives in
-// weaveplatform-api/hvchannel, because the host end of this wire must encode
+// sdk/hvchannel, because the host end of this wire must encode
 // identically and nothing on the channel would detect a mismatch. Core
 // translates between hvchannel envelopes and the module-facing (module, kind,
 // data) Transport primitives; modules never see framing or device nodes.

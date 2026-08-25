@@ -1,7 +1,7 @@
 package supervise
 
 import (
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
 )
 
 // Verifier authenticates a module binary before exec. Modules are fetched

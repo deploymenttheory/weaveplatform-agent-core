@@ -1,0 +1,35 @@
+name: fuzz
+
+on:
+  schedule:
+    # Nightly at 03:17 UTC — a long soak beyond the seed corpus PRs run.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz-manifest:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Fuzz FuzzManifest
+        run: go test ./manifest/ -run '^$' -fuzz '^FuzzManifest$' -fuzztime 5m
+
+      - name: Upload crashers
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-manifest-corpus
+          path: manifest/testdata/fuzz

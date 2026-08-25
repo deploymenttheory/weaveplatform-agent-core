@@ -115,3 +115,17 @@ describe that area say so — in the same change, not a follow-up.
   last one matters most where a call can fail by returning a plausible zero.
 - Say plainly what is unverified. "Compiles but has never run on Windows" is
   more useful than silence, and far more useful than implied confidence.
+
+## Repository layout: two Go modules, one direction
+
+`.` is core (`github.com/deploymenttheory/weaveplatform-agent`, tags `vX.Y.Z`); `sdk/` is
+the module SDK (`…/weaveplatform-agent/sdk`, tags `sdk/vX.Y.Z`). Core `replace`s the sdk to
+`./sdk` and builds the tree it ships with; modules pin the sdk by tag. The sdk **never**
+imports core — CI enforces what the old repository boundary used to. `proto/` and `schema/`
+are sources; `sdk/gen` is generated from them and committed (`buf generate`).
+`test/protocompat/v1` deliberately pins the *old* module paths (`weaveplatform-sdk v0.2.1`,
+`weaveplatform-api v0.2.0`): it is the frozen protocol-1 fixture and must not be rewritten,
+tidied, or bumped by dependabot.
+
+A package belongs in `sdk/` only if something other than core imports it. Otherwise it is
+`internal/`.

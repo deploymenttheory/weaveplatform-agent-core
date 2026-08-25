@@ -18,10 +18,10 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/lifecycle"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
-	controlv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/control/v1"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
-	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-sdk/retry"
+	controlv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/control/v1"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/retry"
 )
 
 // stubIdentity satisfies the control server's Identity dependency for Status.

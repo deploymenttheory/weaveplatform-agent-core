@@ -17,10 +17,10 @@ import (
 
 	"google.golang.org/grpc"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
-	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/ipc"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
 )
 
 // errProtocolUnsupported: the module exited 78 — clean refusal, never
