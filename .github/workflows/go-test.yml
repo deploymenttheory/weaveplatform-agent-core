@@ -16,7 +16,7 @@ jobs:
       matrix:
         # One lane per Go module in this repo; `go test ./...` at the root does
         # not descend into nested modules.
-        module: [".", "sdk"]
+        module: [".", "sdk", "modules/sysinfo"]
         os: [macos-latest, windows-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
     defaults:
@@ -73,23 +73,26 @@ jobs:
   # compile error across a repo boundary; this job is what replaces it.
   # Modules build against the sdk alone and must never depend on core.
   boundary:
-    name: sdk never imports core
+    name: ${{ matrix.module }} never imports core
+    strategy:
+      matrix:
+        module: [sdk, modules/sysinfo]
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version-file: sdk/go.mod
+          go-version-file: ${{ matrix.module }}/go.mod
       - name: Check
-        working-directory: sdk
+        working-directory: ${{ matrix.module }}
         env:
           GOWORK: "off"
         run: |
           if go list -deps ./... | grep -E '^github.com/deploymenttheory/weaveplatform-agent-core/(internal|cmd)(/|$)'; then
-            echo "::error::sdk/ imports core packages — the module SDK must not depend on core"
+            echo "::error::${{ matrix.module }} imports core packages — modules and the SDK build against sdk/ alone"
             exit 1
           fi
-          echo "sdk depends on nothing under weaveplatform-agent/internal or /cmd"
+          echo "${{ matrix.module }} depends on nothing under weaveplatform-agent-core/internal or /cmd"
 
   race:
     name: race ${{ matrix.module }} (${{ matrix.os }})

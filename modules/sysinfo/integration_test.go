@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-sdk/modulesdk/testkit"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/modulesdk/testkit"
 )
 
 // TestSysinfoUnderStubCore drives the built module binary through the real

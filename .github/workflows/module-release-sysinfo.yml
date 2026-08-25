@@ -1,0 +1,17 @@
+name: module-release (sysinfo)
+
+# sysinfo is the platform's own module and the template, so it releases from
+# here — through the same reusable pipeline every product repository calls.
+# The tag shape modules/<id>/vX.Y.Z is release-please's component tag; the
+# reusable workflow strips everything up to the last "/v".
+on:
+  push:
+    tags:
+      - 'modules/sysinfo/v*'
+
+jobs:
+  publish:
+    uses: ./.github/workflows/module-release.yml
+    with:
+      module-dir: modules/sysinfo
+    secrets: inherit

@@ -23,6 +23,7 @@ updates:
     directories:
       - "/"
       - "/sdk"
+      - "/modules/sysinfo"
     schedule:
       # Check for updates to Go modules every week
       interval: "weekly"

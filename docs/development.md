@@ -2,8 +2,9 @@
 
 ## Local setup
 
-This repository holds two Go modules — core at the root and the sdk under `sdk/` — plus the
-frozen protocol fixture under `test/protocompat/v1`. Core's `go.mod` `replace`s the sdk to
+This repository holds three Go modules — core at the root, the sdk under `sdk/`, and the
+sysinfo module under `modules/sysinfo` — plus the frozen protocol fixture under
+`test/protocompat/v1`. Core's `go.mod` `replace`s the sdk to
 `./sdk`, so editing the sdk and building core needs no workspace and no tag. Every Go
 module here is public; no `GOPRIVATE` and no token is needed to fetch them.
 
@@ -40,7 +41,7 @@ binaries and log the bypass loudly; the escape hatch does not exist in release b
 CGO_ENABLED=0 go build -tags dev -o /tmp/wv/weave-agent ./cmd/weave-agent
 CGO_ENABLED=0 go build -o /tmp/wv/weavectl ./cmd/weavectl
 
-# Lay out a module (sysinfo — the platform's own module and the template)
+# Lay out a module (build it from modules/sysinfo)
 mkdir -p /tmp/wv/state/modules/sysinfo
 cp sysinfo-binary /tmp/wv/state/modules/sysinfo/sysinfo
 cp module.manifest.json /tmp/wv/state/modules/sysinfo/
@@ -82,7 +83,7 @@ protocol-compat fixture. Two conventions the tests rely on:
 ## CI and releasing
 
 Conventional-commit PR titles (enforced), golangci-lint and go-test run per Go module
-(`.` and `sdk`) on macOS + Windows + Linux runners; `buf` lints the protos, checks for
+(`.`, `sdk`, `modules/sysinfo`) on macOS + Windows + Linux runners; `buf` lints the protos, checks for
 breaking changes against `main`, and fails if `sdk/gen` drifts from `proto/`. A `boundary`
 job fails if `sdk/` ever imports `weaveplatform-agent/internal` — Go's `internal/` rule is
 path-based, so the compiler would allow it now that the sdk lives in this tree.
@@ -92,9 +93,12 @@ trigger the release workflows and the default `GITHUB_TOKEN` cannot.
 
 Releasing is automatic and per component. Conventional commits accumulate; release-please
 opens one PR per component that changed — `release X.Y.Z` for core, `release sdk X.Y.Z` for
-the sdk — and merging tags `vX.Y.Z` or `sdk/vX.Y.Z`. A core tag builds signed archives and
-the deb (goreleaser + cosign keyless); an sdk tag builds nothing, it is a Go module version
-for modules to pin. `feat:` bumps minor, `fix:` bumps patch, `ci:`/`docs:`/`chore:` don't
+the sdk, `release modules/sysinfo X.Y.Z` for sysinfo — and merging tags `vX.Y.Z`,
+`sdk/vX.Y.Z` or `modules/sysinfo/vX.Y.Z`. A core tag builds signed archives and the deb
+(goreleaser + cosign keyless); an sdk tag builds nothing, it is a Go module version for
+modules to pin; a sysinfo tag runs `module-release.yml` — the reusable pipeline product
+repositories also call — which builds every platform in the manifest and pushes the
+artifacts to GHCR. `feat:` bumps minor, `fix:` bumps patch, `ci:`/`docs:`/`chore:` don't
 release. Commits are assigned to a component by the paths they touch, so keep sdk and core
 changes in separate commits when both move.
 

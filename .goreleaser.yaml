@@ -60,9 +60,25 @@ builds:
       - -X github.com/deploymenttheory/weaveplatform-agent-core/internal/version.Version={{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
+  # The channel-manifest signing tool. Ships with core because it IS core's
+  # verifier with a keygen/sign front end; the channels repository runs it
+  # from this release rather than carrying a copy.
+  - id: weavemanifest
+    main: ./cmd/weavemanifest
+    binary: weavemanifest
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
 archives:
   - id: weaveplatform-agent
-    ids: [weave-agent, weaveboot, weavectl]
+    ids: [weave-agent, weaveboot, weavectl, weavemanifest]
     # weaveplatform-agent_0.1.0_darwin_arm64.tar.gz
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
@@ -83,7 +99,7 @@ archives:
 nfpms:
   - id: weave-agent
     package_name: weave-agent
-    ids: [weave-agent, weaveboot, weavectl]
+    ids: [weave-agent, weaveboot, weavectl, weavemanifest]
     formats: [deb]
     file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Arch }}"
     maintainer: Deployment Theory <support@deploymenttheory.com>

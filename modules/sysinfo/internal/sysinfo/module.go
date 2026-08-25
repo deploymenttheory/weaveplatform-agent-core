@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-sdk/config"
-	"github.com/deploymenttheory/weaveplatform-sdk/modulesdk"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/config"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/modulesdk"
 )
 
 // Config is the module's handshake-delivered configuration.

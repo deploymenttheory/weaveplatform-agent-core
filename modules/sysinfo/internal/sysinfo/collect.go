@@ -3,7 +3,7 @@ package sysinfo
 import (
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-sdk/platform"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/platform"
 )
 
 // Inventory is one collected snapshot of the host.
