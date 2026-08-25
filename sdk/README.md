@@ -55,7 +55,8 @@ It is a different wire from the module protocol, so it does not move the protoco
 
 Start with [`docs/writing-a-module.md`](docs/writing-a-module.md) — the Module interface,
 the Host surface, health semantics, the manifest, and testing with `testkit.StubCore`. Then
-copy `sysinfo`, the platform's own module, which exists to be copied.
+copy [`../modules/sysinfo`](../modules/sysinfo), the platform's own module, which exists to
+be copied — including its `go.mod`, which pins this sdk by version the way a product does.
 
 ## Rules
 

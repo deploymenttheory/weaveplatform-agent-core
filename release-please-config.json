@@ -12,6 +12,14 @@
     "sdk": {
       "release-type": "go",
       "component": "sdk"
+    },
+    "modules/sysinfo": {
+      "release-type": "go",
+      "component": "modules/sysinfo",
+      "extra-files": [
+        "module.manifest.json"
+      ],
+      "release-as": "0.3.0"
     }
   },
   "bootstrap-sha": "c30dccb509278e1e331fe50a45282612d8cf886f"

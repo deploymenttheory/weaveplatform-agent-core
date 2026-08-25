@@ -34,9 +34,11 @@ flowchart LR
 | `cmd/weave-agent` | Core: the supervised, enrolled presence on the machine |
 | `cmd/weaveboot` | Supervises core so core can be replaced in place — staged, health-gated, with rollback |
 | `cmd/weavectl` | Operator CLI over the control socket |
+| `cmd/weavemanifest` | Mints and verifies the channel-manifest signing chain — verify *is* `internal/manifestverify`, so a manifest it accepts is one core accepts |
 | `internal/supervise` | Module supervision: verify-before-exec, privilege drop, handshake, health, crash-loop breaker |
 | `internal/lifecycle` | Module install: fetch, stage, health-gated promote, N-1 retention, rollback |
 | `sdk/` | The module SDK, a nested Go module (`…/weaveplatform-agent/sdk`): `modulesdk`, `handshake`, `ipc`, `platform`, the generated protocol under `gen/`, `manifest` types, `hvchannel`. Everything a module imports, nothing it should not — see [`sdk/README.md`](sdk/README.md) |
+| `modules/sysinfo` | The platform's own module and the template every product module is copied from; a nested Go module (tags `modules/sysinfo/vX.Y.Z`) that pins the sdk by version like any product would, and releases through the same reusable pipeline |
 | `proto/`, `schema/` | The sources `sdk/gen` and the manifest JSON Schemas are generated from; `buf generate` regenerates and CI fails on drift |
 | `test/protocompat` | The test that matters: core at protocol N accepts an N-1 module and cleanly refuses N-3 |
 

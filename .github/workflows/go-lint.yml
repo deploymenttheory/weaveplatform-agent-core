@@ -26,6 +26,7 @@ jobs:
         include:
           - { module: ".", config: ./.golangci.yml }
           - { module: sdk, config: ../.golangci.yml }
+          - { module: modules/sysinfo, config: ../../.golangci.yml }
     runs-on: ubuntu-24.04-arm
 
     steps:
