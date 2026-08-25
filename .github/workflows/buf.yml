@@ -50,7 +50,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           if git cat-file -e "origin/${{ github.base_ref }}:buf.yaml" 2>/dev/null; then
-            buf breaking --against ".git#branch=${{ github.base_ref }}"
+            buf breaking --against "https://github.com/${GITHUB_REPOSITORY}.git#branch=${{ github.base_ref }}"
           else
             echo "base branch has no buf.yaml yet; skipping breaking check"
           fi
