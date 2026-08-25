@@ -54,7 +54,7 @@ jobs:
           echo "no dev build tag in the release build config"
 
       - name: Run goreleaser
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
           args: release --clean
