@@ -17,6 +17,11 @@ weaveplatform/
 └── guestweave/
 ```
 
+**Trap:** a dependency bump inside `sdk/` must be followed by `go mod tidy` at the root — the
+root builds the sdk through its `replace`, so its `go.sum` needs the new hashes too, and a
+`-mod=readonly` build (CI, goreleaser) fails without them. Dependabot only edits `sdk/go.mod`;
+the go-test tidy check catches the gap on the PR.
+
 **Trap:** a workspace masks stale `go.mod` pins — a product can build locally against the
 sdk's HEAD while its recorded requirement is releases behind. CI and goreleaser build from
 the real pins. Before releasing anything, validate in each module with:

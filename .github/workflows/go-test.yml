@@ -51,6 +51,22 @@ jobs:
           GOWORK: "off"
         run: go build ./...
 
+      # The root module builds sdk/ through a replace, so a dependency bump
+      # inside sdk/ (dependabot only edits sdk/go.mod) leaves the root go.sum
+      # without the new hashes. Builds with -mod=readonly then fail with
+      # "missing go.sum entry" — which is how the v0.3.0 release lost its
+      # artifacts. Fail the PR instead.
+      - name: go.mod/go.sum are tidy
+        if: runner.os == 'Linux'
+        env:
+          GOWORK: "off"
+        run: |
+          go mod tidy
+          git diff --exit-code go.mod go.sum || {
+            echo "::error::go.mod/go.sum are not tidy in ${{ matrix.module }} — run 'go mod tidy' here (and at the root after any sdk/ bump)"
+            exit 1
+          }
+
   # Go's internal/ rule is path-based: sdk/ sits inside the tree rooted at
   # weaveplatform-agent/, so the compiler would let it import
   # weaveplatform-agent/internal/... . Before the sdk moved in here that was a
