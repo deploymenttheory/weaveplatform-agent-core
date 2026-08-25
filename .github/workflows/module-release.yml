@@ -148,12 +148,22 @@ jobs:
           done
           ls -la dist/*.deb
 
+      # release-please normally creates the GitHub release when its PR merges,
+      # and this only adds artifacts to it. A hand-cut tag has no release, so
+      # create one rather than lose the debs: a tag that publishes artifacts
+      # needs somewhere to put them.
       - name: Attach debs to the release
         if: steps.manifest.outputs.deb == 'true'
         working-directory: ${{ inputs.module-dir }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ inputs.ref || github.ref_name }}" dist/*.deb --clobber
+          TAG: ${{ inputs.ref || github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || {
+            echo "::notice::no release for $TAG — creating one for the artifacts"
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          }
+          gh release upload "$TAG" dist/*.deb --clobber
 
       - name: Request channel promotion
         env:
