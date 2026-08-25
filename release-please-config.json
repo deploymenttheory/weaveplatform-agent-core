@@ -11,8 +11,7 @@
     },
     "sdk": {
       "release-type": "go",
-      "component": "sdk",
-      "release-as": "0.7.0"
+      "component": "sdk"
     }
   },
   "bootstrap-sha": "c30dccb509278e1e331fe50a45282612d8cf886f"
