@@ -54,3 +54,8 @@ dist/
 # lint/CI artifacts (never commit)
 *.sarif
 golangci-lint-report.sarif
+
+# Local multi-module workspace. Never committed: CI and goreleaser must build
+# from the recorded go.mod pins, and a tracked workspace would mask a stale one.
+go.work
+go.work.sum

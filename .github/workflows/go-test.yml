@@ -10,11 +10,18 @@ permissions:
 
 jobs:
   test:
+    name: ${{ matrix.module }} (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
+        # One lane per Go module in this repo; `go test ./...` at the root does
+        # not descend into nested modules.
+        module: [".", "sdk"]
         os: [macos-latest, windows-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
     steps:
       - name: Harden Runner
         if: runner.os == 'Linux'
@@ -26,29 +33,60 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: ${{ matrix.module }}/go.mod
 
       - name: Test
         env:
           CGO_ENABLED: "0"
+          GOWORK: "off"
         run: go test ./...
 
-      # No committed go.work in CI: build resolves against go.mod pins as a
-      # consumer would. GOWORK=off makes that explicit so a local workspace
-      # can never mask a stale cross-repo pin (a skew that bit us once).
+      # GOWORK=off so a local workspace can never mask a stale pin. The root
+      # module builds the sdk through its `replace => ./sdk`; the sdk lane
+      # builds against its own recorded requirements, which is what a module
+      # author gets.
       - name: Build (GOWORK=off)
         env:
           CGO_ENABLED: "0"
           GOWORK: "off"
         run: go build ./...
 
+  # Go's internal/ rule is path-based: sdk/ sits inside the tree rooted at
+  # weaveplatform-agent/, so the compiler would let it import
+  # weaveplatform-agent/internal/... . Before the sdk moved in here that was a
+  # compile error across a repo boundary; this job is what replaces it.
+  # Modules build against the sdk alone and must never depend on core.
+  boundary:
+    name: sdk never imports core
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: sdk/go.mod
+      - name: Check
+        working-directory: sdk
+        env:
+          GOWORK: "off"
+        run: |
+          if go list -deps ./... | grep -E '^github.com/deploymenttheory/weaveplatform-agent/(internal|cmd)(/|$)'; then
+            echo "::error::sdk/ imports core packages — the module SDK must not depend on core"
+            exit 1
+          fi
+          echo "sdk depends on nothing under weaveplatform-agent/internal or /cmd"
+
   race:
+    name: race ${{ matrix.module }} (${{ matrix.os }})
     # Race detector needs cgo; run it where a C toolchain is reliable.
     strategy:
       fail-fast: false
       matrix:
+        module: [".", "sdk"]
         os: [macos-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
     steps:
       - name: Harden Runner
         if: runner.os == 'Linux'
@@ -60,9 +98,10 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version-file: ${{ matrix.module }}/go.mod
 
       - name: Test (-race)
         env:
           CGO_ENABLED: "1"
+          GOWORK: "off"
         run: go test -race ./...

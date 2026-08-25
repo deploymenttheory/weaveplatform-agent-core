@@ -19,10 +19,10 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/capability"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
-	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-sdk/retry"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/retry"
 )
 
 // Spec is one module the supervisor should run.

@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/ipc"
 )
 
 // Environment variables core sets before exec'ing a module.

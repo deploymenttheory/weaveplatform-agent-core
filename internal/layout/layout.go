@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/deploymenttheory/weaveplatform-sdk/platform"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/platform"
 )
 
 // EnvStateDir redirects the entire layout under one root when set.

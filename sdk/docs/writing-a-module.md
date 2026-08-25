@@ -15,7 +15,7 @@ pull request.
 ```go
 package main
 
-import "github.com/deploymenttheory/weaveplatform-sdk/modulesdk"
+import "github.com/deploymenttheory/weaveplatform-agent/sdk/modulesdk"
 
 func main() { modulesdk.Serve(myproduct.New()) }
 ```
@@ -124,7 +124,7 @@ turns a recoverable condition into a crash loop.
 Every module declares a `module.manifest.json` — id, version, protocol, zone, privilege,
 session placement, platforms, capabilities, signing identity. Core gates launch on it and
 verifies the binary against it before every exec. Schema:
-[`module-manifest.schema.json`](https://github.com/deploymenttheory/weaveplatform-api/blob/main/schema/module-manifest.schema.json).
+[`module-manifest.schema.json`](../../schema/module-manifest.schema.json).
 Declare the least privilege that works (`service`, not `system`), and declare per-user
 session placement rather than discovering at runtime that session 0 has its own clipboard.
 

@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
 	"github.com/deploymenttheory/weaveplatform-agent/test/stubgateweave"
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
 )
 
 // TestQueueSurvivesRestart proves the offline queue counter is recovered

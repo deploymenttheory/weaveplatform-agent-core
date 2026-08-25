@@ -14,7 +14,7 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/verify"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/weaveboot"
-	"github.com/deploymenttheory/weaveplatform-sdk/wlog"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/wlog"
 )
 
 func main() {

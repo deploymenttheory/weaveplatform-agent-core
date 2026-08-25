@@ -10,7 +10,7 @@ import (
 	"syscall"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
 )
 
 // newVerifier (release, Linux).

@@ -1,6 +1,6 @@
 # Release packaging for the agent: weaveboot, weave-agent (core) and
 # weavectl travel together — they install as one unit under the immutable
-# footprint (pkg/README.md), so each platform gets one archive with all
+# footprint (spec.md §9), so each platform gets one archive with all
 # three binaries.
 #
 # Zone A throughout: pure Go, CGO_ENABLED=0, every target cross-compiled

@@ -8,7 +8,7 @@ import (
 
 // Protocol is the protocol integer modules built with this SDK release
 // speak. It moves only when the wire contract does (see
-// weaveplatform-api/PROTOCOL.md).
+// docs/PROTOCOL.md).
 const Protocol uint32 = 1
 
 // Capability names one probed fact about the host, e.g. "platform.osinfo".

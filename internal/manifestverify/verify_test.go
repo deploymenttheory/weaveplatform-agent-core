@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
 )
 
 func makeBundle(t *testing.T) (ed25519.PublicKey, Bundle) {

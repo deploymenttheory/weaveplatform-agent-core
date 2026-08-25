@@ -15,7 +15,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
 )
 
 // signedChannel builds a root-endorsed, signing-key-signed channel manifest

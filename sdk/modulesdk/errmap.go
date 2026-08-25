@@ -3,7 +3,7 @@ package modulesdk
 import (
 	"fmt"
 
-	"github.com/deploymenttheory/weaveplatform-sdk/werror"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/werror"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

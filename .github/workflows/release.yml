@@ -18,6 +18,9 @@ permissions:
 jobs:
   goreleaser:
     name: 📦 Build and sign release archives
+    # Belt and braces for the tag filter above: component tags (sdk/v1.2.3,
+    # modules/<id>/v1.2.3) are not core releases and must never build one.
+    if: ${{ !contains(github.ref_name, '/') }}
     runs-on: ubuntu-latest
     permissions:
       # Attaching the archives to the release.

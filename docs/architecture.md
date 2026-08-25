@@ -6,30 +6,40 @@ agent, any device; **core is the surface, modules are the products**.
 
 ## The repositories
 
-Five repositories, one dependency direction. Nothing imports downward, core and modules never
-import each other, and anything two products share moves up.
+One platform repository with two Go modules, one repository per product, and a data-only
+channels repository. One dependency direction: core and modules never import each other, and
+anything two products share moves up into the sdk.
 
 ```mermaid
 flowchart TD
-    api["<b>weaveplatform-api</b><br/>protobuf contracts, generated Go,<br/>manifest types + JSON Schemas, PROTOCOL.md"]
-    sdk["<b>weaveplatform-sdk</b><br/>modulesdk runtime, ipc, handshake,<br/>werror/wlog/config/retry, platform seam, testkit"]
-    agent["<b>weaveplatform-agent</b><br/>weaveboot · core · weavectl<br/>(this repo)"]
-    modules["<b>weaveplatform-agent-modules</b><br/>one module per directory:<br/>sysinfo, guestweave-*, …"]
-    manifest["<b>weaveplatform-manifest</b><br/>signed channel manifests,<br/>signing chain, weavemanifest tool"]
+    subgraph agent["<b>weaveplatform-agent</b> (this repo)"]
+        sdk["<b>sdk/</b> (Go module, tags sdk/vX.Y.Z)<br/>proto contracts + generated Go, manifest types,<br/>hvchannel, modulesdk, handshake, ipc, platform seam, testkit"]
+        core["<b>.</b> (Go module, tags vX.Y.Z)<br/>weaveboot · weave-agent · weavectl · weavemanifest<br/>internal/ — supervise, lifecycle, verify, store, transport"]
+        sysinfo["<b>modules/sysinfo</b><br/>the platform's own module and the template"]
+    end
+    product["<b>&lt;product&gt;</b> (guestweave, deviceweave, …)<br/>module + wire vocabulary + host tooling"]
+    channels["<b>weaveplatform-channels</b><br/>signed channel manifests, signing keys<br/>(data, no Go)"]
     bindings["go-bindings-*<br/>macosplatform · win32 · wmi"]
 
-    api --> sdk
-    sdk --> agent
-    sdk --> modules
+    sdk --> core
+    sdk --> sysinfo
+    sdk -->|"by version"| product
     bindings --> sdk
-    bindings --> agent
-    bindings --> modules
-    manifest -. "signed channel manifests<br/>(consumed at runtime, never imported)" .-> agent
+    bindings --> core
+    bindings --> product
+    channels -. "signed channel manifests<br/>(consumed at runtime, never imported)" .-> core
 
-    style agent fill:#1f6feb,color:#fff
+    style core fill:#1f6feb,color:#fff
 ```
 
-`weaveplatform-manifest` is deliberately not a Go dependency of anything: core consumes its
+The sdk is a nested module rather than a package of core so that a module can pin `sdk/v0.7`
+while core is at `v0.9`; it is not a separate repository because the boundary bought nothing
+and cost a release cycle on every change. Core builds the sdk it ships with (`replace =>
+./sdk`); modules build against a tagged sdk. Because Go's `internal/` rule is path-based,
+`sdk/` *could* import `weaveplatform-agent/internal/...` — CI forbids it (`go-test.yml`, job
+`boundary`), which is what the old repository boundary used to enforce.
+
+`weaveplatform-channels` is deliberately not a Go dependency of anything: core consumes its
 *documents* over HTTP and verifies them against a root key baked into core
 (`internal/manifestverify`). A signing CVE is a core patch, not an SDK rebuild.
 
@@ -152,7 +162,7 @@ that cannot stay up. A promoted core is confirmed on **readiness, not uptime**: 
 are registered and the control socket is up, core writes a readiness marker weaveboot cleared
 before launch, so its presence proves the new core loads and configures — a fast, health-based
 promotion gate, with the uptime timer as the fallback. The installed footprint (launchd plist,
-service registration, signing identity — see [`../pkg/README.md`](../pkg/README.md)) never
+service registration, signing identity — [`spec.md`](../spec.md) §9) never
 changes; only the binaries behind it do.
 
 ```mermaid
@@ -211,7 +221,7 @@ every weave guest for unrelated reasons, and claiming the channel on it gives
 core a device that opens successfully and then delivers nothing, which is the
 worst failure available because every log line still reads healthy.
 
-The framing lives in `weaveplatform-api/hvchannel` rather than here, because the
+The framing lives in `sdk/hvchannel` rather than here, because the
 host end must encode identically and **nothing on that wire would catch a
 mismatch** — no negotiation, no version exchange, so a field renamed on one side
 just stops matching and the symptom is a guest that never answers.
@@ -237,7 +247,7 @@ The guest holds an Ed25519 public key placed in its image at build time
 (`/etc/weave/channel.pub`, or `--channel-pub`); the host holds the private half in
 the VM's directory. The guest issues a single-use nonce, the host signs it, the
 guest checks the signature against the key it already trusts. The frames and the
-signing message live in `weaveplatform-api/hvchannel` for the same reason the
+signing message live in `sdk/hvchannel` for the same reason the
 framing does: both ends must build them identically and nothing on this wire would
 catch a mismatch.
 

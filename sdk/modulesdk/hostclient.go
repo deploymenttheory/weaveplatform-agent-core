@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/ipc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"

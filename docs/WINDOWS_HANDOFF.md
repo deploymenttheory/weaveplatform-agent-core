@@ -30,7 +30,7 @@ entropy derived from `HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid`
   the registry read.
 
 ### S11 — named-pipe SDDL
-`weaveplatform-sdk/ipc/ipc_windows.go`. Pipes are now created with
+`sdk/ipc/ipc_windows.go`. Pipes are now created with
 `D:(A;;GA;;;SY)(A;;GA;;;BA)` (SYSTEM + Administrators only), replacing
 go-winio's broad default that let any local user open the control/host pipe.
 `ListenPipeSDDL` is provided for privilege-dropped modules that need a wider
@@ -62,7 +62,7 @@ has the PowerShell to mint one. The tests must show:
 ## Follow-ups that need target-OS infrastructure
 
 ### S5 — Windows per-peer identity on the host/control pipes
-`weaveplatform-sdk/ipc/peercred_windows.go` currently returns no uid, so the
+`sdk/ipc/peercred_windows.go` currently returns no uid, so the
 authorizers fall through to the SDDL (S11) as the gate — which is correct and
 sufficient today. To add per-peer PID/identity checks:
 - Get the pipe HANDLE (go-winio does not expose it on `net.Conn`; either

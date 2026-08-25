@@ -20,7 +20,13 @@ jobs:
       with:
         egress-policy: audit
 
-    - uses: googleapis/release-please-action@16a9c90856f42705d54a6fda1823352bdc62cf38 # v4.4.0
+    # Manifest-driven, two components. Core (".") keeps bare vX.Y.Z tags —
+    # goreleaser and the cosign identity depend on that shape. The sdk is a
+    # nested Go module tagged sdk/vX.Y.Z so modules can pin it independently
+    # of core's release cadence; that tag never triggers goreleaser because
+    # its "v*" filter cannot match a "/" (GitHub globs stop at the separator).
+    - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
       with:
-        release-type: go
+        config-file: release-please-config.json
+        manifest-file: .release-please-manifest.json
         token: ${{ secrets.RELEASE_PLEASE_PAT }}

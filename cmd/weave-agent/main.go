@@ -13,7 +13,7 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/core"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/verify"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/version"
-	"github.com/deploymenttheory/weaveplatform-sdk/wlog"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/wlog"
 )
 
 func main() {

@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/manifestverify"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
 )
 
 // signedChannel builds a real root→signing-key→manifest chain carrying one

@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"sync"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
 	"google.golang.org/grpc"
 )
 

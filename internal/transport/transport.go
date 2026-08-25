@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
-	agentv1 "github.com/deploymenttheory/weaveplatform-api/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-sdk/werror"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/werror"
 )
 
 // queueNamespace is the core-owned store namespace for the offline queue.

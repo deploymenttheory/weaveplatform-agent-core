@@ -17,8 +17,12 @@ updates:
       include: "scope"
 
   # Maintain dependencies for Go modules
+  # One entry per Go module. test/protocompat/v1 is deliberately absent: it
+  # is the frozen protocol-1 fixture and must keep its pins.
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories:
+      - "/"
+      - "/sdk"
     schedule:
       # Check for updates to Go modules every week
       interval: "weekly"

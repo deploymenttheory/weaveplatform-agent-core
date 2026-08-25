@@ -15,9 +15,9 @@ import (
 	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
 	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
-	"github.com/deploymenttheory/weaveplatform-api/manifest"
-	"github.com/deploymenttheory/weaveplatform-sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-sdk/retry"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/retry"
 )
 
 func buildTestModule(t *testing.T) string {

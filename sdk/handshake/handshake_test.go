@@ -3,7 +3,7 @@ package handshake
 import (
 	"testing"
 
-	"github.com/deploymenttheory/weaveplatform-sdk/ipc"
+	"github.com/deploymenttheory/weaveplatform-agent/sdk/ipc"
 )
 
 func TestLineRoundTrip(t *testing.T) {
