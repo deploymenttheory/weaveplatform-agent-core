@@ -30,6 +30,10 @@ on:
         description: Repository that receives the module-published dispatch
         type: string
         default: weaveplatform-channels
+      ref:
+        description: Tag to publish (defaults to the tag that triggered the caller). Lets a caller re-publish an existing tag by workflow_dispatch after a pipeline fix, without cutting a new release.
+        type: string
+        default: ""
     # secrets: inherit from the caller supplies GITHUB_TOKEN-adjacent secrets
     # such as RELEASE_PLEASE_PAT without declaring each one here.
 
@@ -49,6 +53,8 @@ jobs:
       # actions/checkout inside a reusable workflow checks out the CALLER's
       # repository at the tag that triggered it, which is what we want.
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref_name }}
 
       - uses: actions/setup-go@v7
         with:
@@ -62,7 +68,7 @@ jobs:
         working-directory: ${{ inputs.module-dir }}
         run: |
           echo "id=$(jq -r .id module.manifest.json)" >> "$GITHUB_OUTPUT"
-          TAG="${GITHUB_REF_NAME}"           # v1.2.3 or some/component/v1.2.3
+          TAG="${{ inputs.ref || github.ref_name }}"   # v1.2.3 or some/component/v1.2.3
           VERSION="${TAG##*/}"; VERSION="${VERSION#v}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           if jq -e '.platforms[] | select(.os=="linux")' module.manifest.json >/dev/null && [ -x packaging/build-deb.sh ]; then
@@ -108,12 +114,19 @@ jobs:
 
       - uses: oras-project/setup-oras@v2
 
+      # GHCR ties an existing package to the repository that first pushed it;
+      # GITHUB_TOKEN from any other repository gets 403 on the blob push. That
+      # bit sysinfo the moment it moved here from weaveplatform-agent-modules.
+      # A PAT with write:packages is org-scoped and does not care, so it is
+      # preferred when the caller inherits one; the fallback is the caller's
+      # own token, which is enough for a package this repository created.
       - name: Publish to GHCR
         env:
           ID: ${{ steps.manifest.outputs.id }}
           VERSION: ${{ steps.manifest.outputs.version }}
+          REGISTRY_TOKEN: ${{ secrets.RELEASE_PLEASE_PAT || secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          echo "$REGISTRY_TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           cd "$RUNNER_TEMP/dist"
           oras push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/weaveplatform-modules/${ID}:${VERSION}" \
             --artifact-type application/vnd.weave.module \

@@ -8,10 +8,17 @@ on:
   push:
     tags:
       - 'modules/sysinfo/v*'
+  # Re-publish an existing tag after a pipeline fix without cutting a release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish, e.g. modules/sysinfo/v0.3.0
+        required: true
 
 jobs:
   publish:
     uses: ./.github/workflows/module-release.yml
     with:
       module-dir: modules/sysinfo
+      ref: ${{ inputs.tag || '' }}
     secrets: inherit
