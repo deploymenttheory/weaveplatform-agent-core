@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.4.0...v0.5.0) (2026-08-25)
+
+
+### Features
+
+* sysinfo moves in as modules/sysinfo, weavemanifest ships with core ([9507270](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/9507270a9dc6a257bb88f562cc5377a9e06c86aa))
+* sysinfo moves in as modules/sysinfo, weavemanifest ships with core ([2943532](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/2943532541e13626ac2434e687f9bd55b6ec67c2))
+
 ## [0.4.0](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.3.1...v0.4.0) (2026-08-25)
 
 
