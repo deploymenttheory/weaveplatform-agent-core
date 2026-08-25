@@ -41,6 +41,16 @@ jobs:
         app-id: ${{ vars.RP_APP_ID }}
         private-key: ${{ secrets.RP_APP_PRIVATE_KEY }}
 
+    # continue-on-error above hides a missing key, and a silent fallback is
+    # how a repo ends up believing it uses the App when it never has. Say so.
+    - name: Which credential
+      run: |
+        if [ -n "${{ steps.app-token.outputs.token }}" ]; then
+          echo "release-please is using the release-please-manager App"
+        else
+          echo "::warning::App token unavailable (RP_APP_PRIVATE_KEY unset or the App is not installed here) — falling back to RELEASE_PLEASE_PAT"
+        fi
+
     # Manifest-driven, two components. Core (".") keeps bare vX.Y.Z tags —
     # goreleaser and the cosign identity depend on that shape. The sdk is a
     # nested Go module tagged sdk/vX.Y.Z so modules can pin it independently
