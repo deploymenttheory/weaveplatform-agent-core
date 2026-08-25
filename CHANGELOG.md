@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.2.2...v0.3.0) (2026-08-25)
+
+
+### Features
+
+* absorb weaveplatform-sdk and weaveplatform-api as the nested sdk/ module ([5f2439d](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/5f2439dac5ade885acd760e5da30e3091a5460a0))
+* absorb weaveplatform-sdk and weaveplatform-api as the nested sdk/ module ([b7e21cf](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/b7e21cf72771c649f37ca66eb829159d33d5f46e))
+
 ## [0.2.2](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.2.1...v0.2.2) (2026-08-25)
 
 
