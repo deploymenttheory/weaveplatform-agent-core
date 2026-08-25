@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.5.0...v0.5.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **module-release:** create the release when attaching artifacts to a tag that has none ([918d3cd](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/918d3cd68f7555a1b1c8bc527c74a77a7055b7a0))
+* **module-release:** the debs land in dist/, and upload to the ref that was published ([9bad51d](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/9bad51d92b8e2a31bf5933e3a9de630f28e54f9b))
+
 ## [0.5.0](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.4.0...v0.5.0) (2026-08-25)
 
 
