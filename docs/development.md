@@ -97,3 +97,9 @@ the deb (goreleaser + cosign keyless); an sdk tag builds nothing, it is a Go mod
 for modules to pin. `feat:` bumps minor, `fix:` bumps patch, `ci:`/`docs:`/`chore:` don't
 release. Commits are assigned to a component by the paths they touch, so keep sdk and core
 changes in separate commits when both move.
+
+**Merge the sdk release PR first, then close and let release-please regenerate the core one.**
+Both PRs edit `.release-please-manifest.json`. Once one merges, the other's branch is stale
+and conflicts — and release-please does not rebase a release PR whose version did not change
+("PR remained the same"), so the conflict never clears on its own. Closing it makes the next
+push to `main` open a fresh one.
