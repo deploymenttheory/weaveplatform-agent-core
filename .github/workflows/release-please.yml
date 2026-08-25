@@ -19,6 +19,27 @@ jobs:
       uses: step-security/harden-runner@5ef0c079ce82195b2a36a210272d6b661572d83e # v2.14.2
       with:
         egress-policy: audit
+    # The org's release-please-manager App (contents+pull_requests+actions:
+    # write) rather than a personal token. Two reasons it is the better
+    # credential: the token is minted per run and expires in an hour, and it
+    # belongs to the org rather than to whoever created the PAT — a PAT dies
+    # with its owner's access and takes every repo's releases with it.
+    #
+    # actions:write is the load-bearing permission. Tags pushed with the
+    # default GITHUB_TOKEN deliberately do not trigger workflows, which would
+    # leave every release tagged and unbuilt; the App, like the PAT before it,
+    # can.
+    #
+    # The fallback keeps releases working where the App is not installed or
+    # its private key is not yet provisioned: continue-on-error means a
+    # missing key costs a skipped step, not a failed release.
+    - uses: actions/create-github-app-token@v2
+      id: app-token
+      if: ${{ vars.RP_APP_ID != '' }}
+      continue-on-error: true
+      with:
+        app-id: ${{ vars.RP_APP_ID }}
+        private-key: ${{ secrets.RP_APP_PRIVATE_KEY }}
 
     # Manifest-driven, two components. Core (".") keeps bare vX.Y.Z tags —
     # goreleaser and the cosign identity depend on that shape. The sdk is a
@@ -29,4 +50,4 @@ jobs:
       with:
         config-file: release-please-config.json
         manifest-file: .release-please-manifest.json
-        token: ${{ secrets.RELEASE_PLEASE_PAT }}
+        token: ${{ steps.app-token.outputs.token || secrets.RELEASE_PLEASE_PAT }}
