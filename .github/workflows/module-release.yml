@@ -139,17 +139,21 @@ jobs:
         if: steps.manifest.outputs.deb == 'true'
         working-directory: ${{ inputs.module-dir }}
         run: |
+          # build-deb.sh takes the output directory as its second argument and
+          # defaults to dist/; packaging/.build/ is only its staging area for
+          # the cross-compiled binary (nfpm globs contents[].src before it
+          # expands variables, so that path is fixed).
           for arch in $(jq -r '.platforms[] | select(.os=="linux") | .arch' module.manifest.json); do
-            sh packaging/build-deb.sh "$arch"
+            sh packaging/build-deb.sh "$arch" dist
           done
-          ls -la packaging/.build/*.deb
+          ls -la dist/*.deb
 
       - name: Attach debs to the release
         if: steps.manifest.outputs.deb == 'true'
         working-directory: ${{ inputs.module-dir }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$GITHUB_REF_NAME" packaging/.build/*.deb --clobber
+        run: gh release upload "${{ inputs.ref || github.ref_name }}" dist/*.deb --clobber
 
       - name: Request channel promotion
         env:
