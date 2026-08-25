@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.3.0...v0.3.1) (2026-08-25)
+
+
+### Bug Fixes
+
+* **build:** tidy the root go.sum after the sdk dependency bumps, and check it in CI ([38223c0](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/38223c0f5673e6998526647a521d66b1c8a1e46b))
+
 ## [0.3.0](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.2.2...v0.3.0) (2026-08-25)
 
 
