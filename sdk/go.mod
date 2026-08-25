@@ -1,4 +1,4 @@
-module github.com/deploymenttheory/weaveplatform-agent/sdk
+module github.com/deploymenttheory/weaveplatform-agent-core/sdk
 
 go 1.26.5
 

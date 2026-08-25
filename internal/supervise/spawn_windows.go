@@ -10,8 +10,8 @@ import (
 	"github.com/deploymenttheory/go-bindings-win32/bindings/win32/foundation"
 	winsec "github.com/deploymenttheory/go-bindings-win32/bindings/win32/security"
 	"github.com/deploymenttheory/go-bindings-win32/bindings/win32/system/threading"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/ipc"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/ipc"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
 	"golang.org/x/sys/windows"
 )
 

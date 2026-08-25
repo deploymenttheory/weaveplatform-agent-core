@@ -154,8 +154,8 @@ const file_weave_agent_v1_health_proto_rawDesc = "" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eSTATUS_HEALTHY\x10\x01\x12\x13\n" +
 	"\x0fSTATUS_DEGRADED\x10\x02\x12\x14\n" +
-	"\x10STATUS_UNHEALTHY\x10\x03B\xce\x01\n" +
-	"\x12com.weave.agent.v1B\vHealthProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"\x10STATUS_UNHEALTHY\x10\x03B\xd3\x01\n" +
+	"\x12com.weave.agent.v1B\vHealthProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_health_proto_rawDescOnce sync.Once

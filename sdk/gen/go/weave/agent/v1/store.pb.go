@@ -404,9 +404,9 @@ const file_weave_agent_v1_store_proto_rawDesc = "" +
 	"\x03Get\x12\x1f.weave.agent.v1.StoreGetRequest\x1a .weave.agent.v1.StoreGetResponse\x12H\n" +
 	"\x03Put\x12\x1f.weave.agent.v1.StorePutRequest\x1a .weave.agent.v1.StorePutResponse\x12Q\n" +
 	"\x06Delete\x12\".weave.agent.v1.StoreDeleteRequest\x1a#.weave.agent.v1.StoreDeleteResponse\x12K\n" +
-	"\x04List\x12 .weave.agent.v1.StoreListRequest\x1a!.weave.agent.v1.StoreListResponseB\xcd\x01\n" +
+	"\x04List\x12 .weave.agent.v1.StoreListRequest\x1a!.weave.agent.v1.StoreListResponseB\xd2\x01\n" +
 	"\x12com.weave.agent.v1B\n" +
-	"StoreProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"StoreProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_store_proto_rawDescOnce sync.Once

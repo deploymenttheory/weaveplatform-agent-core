@@ -12,9 +12,9 @@ import (
 	"runtime"
 	"slices"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/manifestverify"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/manifestverify"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/supervise"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
 )
 
 // NewChannel authenticates module binaries against a signed channel manifest:

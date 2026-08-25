@@ -12,7 +12,7 @@ package verify
 import (
 	"log/slog"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/supervise"
 )
 
 // New returns the platform module verifier for this build.

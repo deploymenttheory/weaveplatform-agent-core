@@ -20,7 +20,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 	bolterr "go.etcd.io/bbolt/errors"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/store/keyprotect"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/store/keyprotect"
 )
 
 // Store implements hostserv.StoreBackend with encryption at rest.

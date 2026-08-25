@@ -1,0 +1,151 @@
+name: module-release
+
+# The one module publish pipeline, shared by every product repository.
+#
+# A product repo's release workflow is ten lines: on a `v*` tag, call this with
+# the directory holding its module.manifest.json and `secrets: inherit`. One
+# copy here means one place to fix; the alternative — a 120-line workflow per
+# product — drifts the moment there are two products.
+#
+# What it does: builds the module for every platform the manifest declares
+# (the manifest is the only list, so it cannot drift from the build), stamps a
+# sidecar manifest with each artifact's digest and size, pushes the lot to
+# GHCR via ORAS content-addressed by digest — the same primitive the channel
+# manifest records and core's verify-before-exec enforces — builds the Linux
+# deb when the module ships packaging for it, and asks the channels repository
+# to open a promotion PR.
+#
+# Code signing (codesign+notarize with the Team ID from the module manifest;
+# Authenticode) slots into the "Sign" step once signing identities are
+# provisioned as secrets in the calling repository.
+
+on:
+  workflow_call:
+    inputs:
+      module-dir:
+        description: Directory (relative to the caller's repo root) holding module.manifest.json and the main package
+        type: string
+        required: true
+      channels-repo:
+        description: Repository that receives the module-published dispatch
+        type: string
+        default: weaveplatform-channels
+    # secrets: inherit from the caller supplies GITHUB_TOKEN-adjacent secrets
+    # such as RELEASE_PLEASE_PAT without declaring each one here.
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      # actions/checkout inside a reusable workflow checks out the CALLER's
+      # repository at the tag that triggered it, which is what we want.
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ inputs.module-dir }}/go.mod
+
+      # The ORAS name is the manifest id, never the directory: a product repo
+      # calls its directory whatever it likes, but core discovers modules by
+      # id and the channel manifest addresses them by id.
+      - name: Read manifest
+        id: manifest
+        working-directory: ${{ inputs.module-dir }}
+        run: |
+          echo "id=$(jq -r .id module.manifest.json)" >> "$GITHUB_OUTPUT"
+          TAG="${GITHUB_REF_NAME}"           # v1.2.3 or some/component/v1.2.3
+          VERSION="${TAG##*/}"; VERSION="${VERSION#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if jq -e '.platforms[] | select(.os=="linux")' module.manifest.json >/dev/null && [ -x packaging/build-deb.sh ]; then
+            echo "deb=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deb=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build every platform the manifest declares
+        working-directory: ${{ inputs.module-dir }}
+        env:
+          ID: ${{ steps.manifest.outputs.id }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist"
+          for pair in $(jq -r '.platforms[] | "\(.os)/\(.arch)"' module.manifest.json); do
+            GOOS="${pair%%/*}"; GOARCH="${pair##*/}"
+            EXT=""; [ "$GOOS" = "windows" ] && EXT=".exe"
+            CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build -trimpath -o "$RUNNER_TEMP/dist/${ID}-${GOOS}-${GOARCH}${EXT}" .
+          done
+          ls -la "$RUNNER_TEMP/dist"
+
+      # Signing hook: codesign/notarize + Authenticode go here.
+
+      - name: Stamp sidecar manifest
+        working-directory: ${{ inputs.module-dir }}
+        env:
+          ID: ${{ steps.manifest.outputs.id }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+        run: |
+          ARTS="[]"
+          for f in "$RUNNER_TEMP"/dist/*; do
+            base=$(basename "$f")
+            os=$(echo "$base" | sed -E "s/^${ID}-([a-z]+)-.*/\1/")
+            arch=$(echo "$base" | sed -E "s/^${ID}-[a-z]+-([a-z0-9]+)(\.exe)?$/\1/")
+            digest="sha256:$(sha256sum "$f" | cut -d' ' -f1)"
+            size=$(stat -c%s "$f")
+            ARTS=$(echo "$ARTS" | jq --arg os "$os" --arg arch "$arch" --arg d "$digest" --argjson s "$size" \
+              '. + [{os:$os, arch:$arch, digest:$d, size:$s}]')
+          done
+          jq --arg v "$VERSION" --argjson arts "$ARTS" '.version=$v | .artifacts=$arts' \
+            module.manifest.json > "$RUNNER_TEMP/dist/module.manifest.json"
+          cat "$RUNNER_TEMP/dist/module.manifest.json"
+
+      - uses: oras-project/setup-oras@v2
+
+      - name: Publish to GHCR
+        env:
+          ID: ${{ steps.manifest.outputs.id }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          cd "$RUNNER_TEMP/dist"
+          oras push "ghcr.io/${GITHUB_REPOSITORY_OWNER}/weaveplatform-modules/${ID}:${VERSION}" \
+            --artifact-type application/vnd.weave.module \
+            ./*
+
+      # Linux's exec-time trust construct is the package manager (see core's
+      # internal/verify/release_linux.go), so a module that declares linux
+      # and ships packaging/ gets its debs attached to the GitHub release.
+      - name: Build debs
+        if: steps.manifest.outputs.deb == 'true'
+        working-directory: ${{ inputs.module-dir }}
+        run: |
+          for arch in $(jq -r '.platforms[] | select(.os=="linux") | .arch' module.manifest.json); do
+            sh packaging/build-deb.sh "$arch"
+          done
+          ls -la packaging/.build/*.deb
+
+      - name: Attach debs to the release
+        if: steps.manifest.outputs.deb == 'true'
+        working-directory: ${{ inputs.module-dir }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$GITHUB_REF_NAME" packaging/.build/*.deb --clobber
+
+      - name: Request channel promotion
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_PAT }}
+          ID: ${{ steps.manifest.outputs.id }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY_OWNER}/${{ inputs.channels-repo }}/dispatches" \
+            -f event_type=module-published \
+            -F 'client_payload[module]='"$ID" \
+            -F 'client_payload[version]='"$VERSION" || \
+            echo "::warning::promotion dispatch failed — promote manually"

@@ -286,8 +286,8 @@ const file_weave_agent_v1_handshake_proto_rawDesc = "" +
 	"\x1dSESSION_PLACEMENT_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18SESSION_PLACEMENT_SYSTEM\x10\x01\x12&\n" +
 	"\"SESSION_PLACEMENT_PER_USER_CONSOLE\x10\x02\x12\"\n" +
-	"\x1eSESSION_PLACEMENT_PER_USER_ALL\x10\x03B\xd1\x01\n" +
-	"\x12com.weave.agent.v1B\x0eHandshakeProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"\x1eSESSION_PLACEMENT_PER_USER_ALL\x10\x03B\xd6\x01\n" +
+	"\x12com.weave.agent.v1B\x0eHandshakeProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_handshake_proto_rawDescOnce sync.Once

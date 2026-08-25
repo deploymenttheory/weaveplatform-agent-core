@@ -12,16 +12,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/capability"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/lifecycle"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
-	controlv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/control/v1"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/retry"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/capability"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/eventbus"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/hostserv"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/layout"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/lifecycle"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/supervise"
+	controlv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/control/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/retry"
 )
 
 // stubIdentity satisfies the control server's Identity dependency for Status.

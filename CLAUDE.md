@@ -118,7 +118,7 @@ describe that area say so — in the same change, not a follow-up.
 
 ## Repository layout: two Go modules, one direction
 
-`.` is core (`github.com/deploymenttheory/weaveplatform-agent`, tags `vX.Y.Z`); `sdk/` is
+`.` is core (`github.com/deploymenttheory/weaveplatform-agent-core`, tags `vX.Y.Z`); `sdk/` is
 the module SDK (`…/weaveplatform-agent/sdk`, tags `sdk/vX.Y.Z`). Core `replace`s the sdk to
 `./sdk` and builds the tree it ships with; modules pin the sdk by tag. The sdk **never**
 imports core — CI enforces what the old repository boundary used to. `proto/` and `schema/`

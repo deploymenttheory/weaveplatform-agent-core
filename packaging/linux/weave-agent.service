@@ -1,6 +1,6 @@
 [Unit]
 Description=Weave platform agent
-Documentation=https://github.com/deploymenttheory/weaveplatform-agent
+Documentation=https://github.com/deploymenttheory/weaveplatform-agent-core
 
 # Deliberately not After=network-online.target. The agent is the thing that has
 # to be able to repair a guest whose networking is broken, so an agent that only

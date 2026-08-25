@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/capability"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/retry"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/capability"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/eventbus"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/hostserv"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/layout"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/retry"
 )
 
 func buildTestModule(t *testing.T) string {

@@ -9,7 +9,7 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/hvchannel"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/hvchannel"
 )
 
 // Privilege levels a manifest may declare. Not every module is root.

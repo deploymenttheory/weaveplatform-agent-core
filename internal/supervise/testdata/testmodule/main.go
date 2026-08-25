@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/modulesdk"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/modulesdk"
 )
 
 type testmod struct {

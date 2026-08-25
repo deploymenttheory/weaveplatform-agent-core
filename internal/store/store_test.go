@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/store/keyprotect"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/store/keyprotect"
 )
 
 func openTest(t *testing.T, dir string) *Store {

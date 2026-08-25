@@ -150,8 +150,8 @@ const file_weave_agent_v1_log_proto_rawDesc = "" +
 	"\x10LogWriteResponse2T\n" +
 	"\n" +
 	"LogService\x12F\n" +
-	"\x05Write\x12\x19.weave.agent.v1.LogRecord\x1a .weave.agent.v1.LogWriteResponse(\x01B\xcb\x01\n" +
-	"\x12com.weave.agent.v1B\bLogProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"\x05Write\x12\x19.weave.agent.v1.LogRecord\x1a .weave.agent.v1.LogWriteResponse(\x01B\xd0\x01\n" +
+	"\x12com.weave.agent.v1B\bLogProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_log_proto_rawDescOnce sync.Once

@@ -27,11 +27,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/manifestverify"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
-	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/layout"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/manifestverify"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/supervise"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
 )
 
 // SeqStore is the subset of the store the manager needs to persist the

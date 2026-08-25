@@ -4,7 +4,7 @@ managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go
+      value: github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go
 plugins:
   - local: protoc-gen-go
     out: sdk/gen/go

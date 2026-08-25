@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
 )
 
 // The in-memory backends carry the seams until the real implementations

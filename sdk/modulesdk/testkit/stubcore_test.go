@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/handshake"
 )
 
 // buildToy builds the toy module once per test binary run.

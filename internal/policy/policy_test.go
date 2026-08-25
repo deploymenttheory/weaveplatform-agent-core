@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/store"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/store/keyprotect"
-	"github.com/deploymenttheory/weaveplatform-agent/test/stubgateweave"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/store"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/store/keyprotect"
+	"github.com/deploymenttheory/weaveplatform-agent-core/test/stubgateweave"
 )
 
 func TestFetchWatchAndCache(t *testing.T) {

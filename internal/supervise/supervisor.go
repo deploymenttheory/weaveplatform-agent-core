@@ -16,13 +16,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/capability"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
-	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/retry"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/capability"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/hostserv"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/layout"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/retry"
 )
 
 // Spec is one module the supervisor should run.

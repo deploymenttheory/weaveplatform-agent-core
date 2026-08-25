@@ -10,9 +10,9 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/controlsock"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
-	controlv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/control/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/controlsock"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/layout"
+	controlv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/control/v1"
 )
 
 const usage = `weavectl — Weave platform agent control

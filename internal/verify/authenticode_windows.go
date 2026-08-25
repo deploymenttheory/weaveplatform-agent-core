@@ -14,8 +14,8 @@ import (
 	"github.com/deploymenttheory/go-bindings-win32/bindings/win32/foundation"
 	crypt "github.com/deploymenttheory/go-bindings-win32/bindings/win32/security/cryptography"
 	"github.com/deploymenttheory/go-bindings-win32/bindings/win32/security/wintrust"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/supervise"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/supervise"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
 )
 
 // newVerifier (release, Windows).

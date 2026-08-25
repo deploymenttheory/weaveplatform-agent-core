@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/deploymenttheory/weaveplatform-agent/schema/channel-manifest.schema.json",
+  "$id": "https://github.com/deploymenttheory/weaveplatform-agent-core/schema/channel-manifest.schema.json",
   "title": "Weave channel manifest",
   "description": "A signed document mapping a channel to a known-good set of core and module versions and the protocol they assume. SaaS follows a rolling manifest; self-hosted pins one. Same mechanism, different policy. Signature is a detached minisign-style Ed25519 signature beside the file.",
   "type": "object",

@@ -6,7 +6,7 @@
 package capability
 
 import (
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/platform"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/platform"
 )
 
 // Set is the probed capability inventory: name → attributes.
