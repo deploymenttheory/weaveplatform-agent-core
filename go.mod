@@ -3,7 +3,7 @@ module github.com/deploymenttheory/weaveplatform-agent
 go 1.26.5
 
 require (
-	github.com/deploymenttheory/go-bindings-win32 v0.2.1
+	github.com/deploymenttheory/go-bindings-win32 v0.3.1
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
