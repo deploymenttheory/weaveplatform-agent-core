@@ -3,7 +3,7 @@ package supervise
 import (
 	"time"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
 )
 
 // State is a supervised module's lifecycle state as reported to operators.

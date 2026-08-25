@@ -107,8 +107,8 @@ const file_weave_agent_v1_ui_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
 	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x12\n" +
-	"\x04data\x18\x04 \x01(\fR\x04dataB\xca\x01\n" +
-	"\x12com.weave.agent.v1B\aUiProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"\x04data\x18\x04 \x01(\fR\x04dataB\xcf\x01\n" +
+	"\x12com.weave.agent.v1B\aUiProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_ui_proto_rawDescOnce sync.Once

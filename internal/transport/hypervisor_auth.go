@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/hvchannel"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/hvchannel"
 )
 
 // The guest end of channel authentication.

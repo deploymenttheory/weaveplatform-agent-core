@@ -11,7 +11,7 @@
 package controlv1
 
 import (
-	v1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
+	v1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -805,8 +805,8 @@ const file_weave_control_v1_control_proto_rawDesc = "" +
 	"\bSurfaces\x12!.weave.control.v1.SurfacesRequest\x1a\".weave.control.v1.SurfacesResponse\x12N\n" +
 	"\aInstall\x12 .weave.control.v1.InstallRequest\x1a!.weave.control.v1.InstallResponse\x12Q\n" +
 	"\bRollback\x12!.weave.control.v1.RollbackRequest\x1a\".weave.control.v1.RollbackResponse\x12B\n" +
-	"\x04Logs\x12\x1d.weave.control.v1.LogsRequest\x1a\x19.weave.control.v1.LogLine0\x01B\xdd\x01\n" +
-	"\x14com.weave.control.v1B\fControlProtoP\x01ZUgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/control/v1;controlv1\xa2\x02\x03WCX\xaa\x02\x10Weave.Control.V1\xca\x02\x10Weave\\Control\\V1\xe2\x02\x1cWeave\\Control\\V1\\GPBMetadata\xea\x02\x12Weave::Control::V1b\x06proto3"
+	"\x04Logs\x12\x1d.weave.control.v1.LogsRequest\x1a\x19.weave.control.v1.LogLine0\x01B\xe2\x01\n" +
+	"\x14com.weave.control.v1B\fControlProtoP\x01ZZgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/control/v1;controlv1\xa2\x02\x03WCX\xaa\x02\x10Weave.Control.V1\xca\x02\x10Weave\\Control\\V1\xe2\x02\x1cWeave\\Control\\V1\\GPBMetadata\xea\x02\x12Weave::Control::V1b\x06proto3"
 
 var (
 	file_weave_control_v1_control_proto_rawDescOnce sync.Once

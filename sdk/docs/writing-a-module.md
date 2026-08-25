@@ -5,7 +5,7 @@ supervises, and speaks gRPC to over a local socket. You implement one interface;
 runtime handles everything on the wire.
 
 The rules come from
-[spec §5](https://github.com/deploymenttheory/weaveplatform-agent/blob/main/spec.md):
+[spec §5](https://github.com/deploymenttheory/weaveplatform-agent-core/blob/main/spec.md):
 modules never import each other, never open their own sockets, never draw UI, and `Host` is
 closed by default — a module needing a new host method is an architecture decision, not a
 pull request.
@@ -15,7 +15,7 @@ pull request.
 ```go
 package main
 
-import "github.com/deploymenttheory/weaveplatform-agent/sdk/modulesdk"
+import "github.com/deploymenttheory/weaveplatform-agent-core/sdk/modulesdk"
 
 func main() { modulesdk.Serve(myproduct.New()) }
 ```

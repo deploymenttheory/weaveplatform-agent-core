@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/core"
-	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/modulesdk/testkit"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/core"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/modulesdk/testkit"
 )
 
 // TestEveryWindowMemberHasFixture is the invariant that keeps §11 honest as

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/ipc"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/ipc"
 )
 
 // controlAuthorizer permits only root or core's own user to drive the

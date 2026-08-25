@@ -129,8 +129,8 @@ const file_weave_agent_v1_watchdog_proto_rawDesc = "" +
 	"\x0fWatchdogSummary\x12\x1a\n" +
 	"\breceived\x18\x01 \x01(\x04R\breceived2\\\n" +
 	"\x0fWatchdogService\x12I\n" +
-	"\x06Notify\x12\x1c.weave.agent.v1.WatchdogPing\x1a\x1f.weave.agent.v1.WatchdogSummary(\x01B\xd0\x01\n" +
-	"\x12com.weave.agent.v1B\rWatchdogProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"\x06Notify\x12\x1c.weave.agent.v1.WatchdogPing\x1a\x1f.weave.agent.v1.WatchdogSummary(\x01B\xd5\x01\n" +
+	"\x12com.weave.agent.v1B\rWatchdogProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_watchdog_proto_rawDescOnce sync.Once

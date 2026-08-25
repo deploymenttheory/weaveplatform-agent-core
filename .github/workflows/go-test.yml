@@ -85,7 +85,7 @@ jobs:
         env:
           GOWORK: "off"
         run: |
-          if go list -deps ./... | grep -E '^github.com/deploymenttheory/weaveplatform-agent/(internal|cmd)(/|$)'; then
+          if go list -deps ./... | grep -E '^github.com/deploymenttheory/weaveplatform-agent-core/(internal|cmd)(/|$)'; then
             echo "::error::sdk/ imports core packages — the module SDK must not depend on core"
             exit 1
           fi

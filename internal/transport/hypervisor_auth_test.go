@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/hvchannel"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/hvchannel"
 )
 
 // authenticatedForTest returns an auth that is already past the handshake, for

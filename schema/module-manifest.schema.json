@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/deploymenttheory/weaveplatform-agent/schema/module-manifest.schema.json",
+  "$id": "https://github.com/deploymenttheory/weaveplatform-agent-core/schema/module-manifest.schema.json",
   "title": "Weave module manifest",
   "description": "Declared by every module: authored as module.manifest.json in the module's source directory, embedded in the module binary for handshake cross-checking, and published as a signed sidecar whose distribution subset is carried in the channel manifest.",
   "type": "object",

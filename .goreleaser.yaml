@@ -29,7 +29,7 @@ builds:
       # internal/version owns the version; everything asks it, so there is
       # nothing to keep in sync.
       - -s -w
-      - -X github.com/deploymenttheory/weaveplatform-agent/internal/version.Version={{ .Version }}
+      - -X github.com/deploymenttheory/weaveplatform-agent-core/internal/version.Version={{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
   - id: weaveboot
@@ -43,7 +43,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/deploymenttheory/weaveplatform-agent/internal/version.Version={{ .Version }}
+      - -X github.com/deploymenttheory/weaveplatform-agent-core/internal/version.Version={{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
   - id: weavectl
@@ -57,7 +57,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w
-      - -X github.com/deploymenttheory/weaveplatform-agent/internal/version.Version={{ .Version }}
+      - -X github.com/deploymenttheory/weaveplatform-agent-core/internal/version.Version={{ .Version }}
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
@@ -92,7 +92,7 @@ nfpms:
       The one supervised, policied, authenticated presence on a machine:
       weaveboot supervising core, core supervising modules.
     vendor: Deployment Theory
-    homepage: https://github.com/deploymenttheory/weaveplatform-agent
+    homepage: https://github.com/deploymenttheory/weaveplatform-agent-core
     license: MIT
     section: admin
     priority: optional
@@ -175,7 +175,7 @@ release:
     ```console
     cosign verify-blob \
       --bundle weaveplatform-agent_{{ .Version }}_checksums.txt.sigstore.json \
-      --certificate-identity-regexp 'https://github.com/deploymenttheory/weaveplatform-agent/.*' \
+      --certificate-identity-regexp 'https://github.com/deploymenttheory/weaveplatform-agent-core/.*' \
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
       weaveplatform-agent_{{ .Version }}_checksums.txt
 

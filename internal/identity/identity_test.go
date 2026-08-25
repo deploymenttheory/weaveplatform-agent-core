@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
-	"github.com/deploymenttheory/weaveplatform-agent/test/stubgateweave"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/hostserv"
+	"github.com/deploymenttheory/weaveplatform-agent-core/test/stubgateweave"
 )
 
 func testLog() *slog.Logger {

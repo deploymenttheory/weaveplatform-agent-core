@@ -1,6 +1,6 @@
 package controlsock
 
-import "github.com/deploymenttheory/weaveplatform-agent/sdk/ipc"
+import "github.com/deploymenttheory/weaveplatform-agent-core/sdk/ipc"
 
 // controlAuthorizer on Windows is allow-all here: the control pipe's
 // restrictive SDDL (SYSTEM + Administrators, set by ipc) is the gate, since

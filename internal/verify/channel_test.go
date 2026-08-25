@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/manifestverify"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/manifestverify"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
 )
 
 // signedChannel builds a real root→signing-key→manifest chain carrying one

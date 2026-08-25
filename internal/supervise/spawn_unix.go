@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/ipc"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/ipc"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
 )
 
 // jobHandle is Windows-only containment; a no-op here. Unix containment is

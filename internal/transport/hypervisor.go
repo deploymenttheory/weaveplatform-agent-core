@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"sync"
 
-	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/hvchannel"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/hvchannel"
 )
 
 // The hypervisor channel is a single byte pipe (virtio-serial / vsock /

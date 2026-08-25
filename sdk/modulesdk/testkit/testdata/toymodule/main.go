@@ -5,7 +5,7 @@ package main
 import (
 	"context"
 
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/modulesdk"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/modulesdk"
 )
 
 type toy struct {

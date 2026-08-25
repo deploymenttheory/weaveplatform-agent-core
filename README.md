@@ -48,7 +48,7 @@ cd sdk && CGO_ENABLED=0 go build ./...    # the sdk on its own recorded pins —
 ```
 
 Zone A throughout: static, no cgo, macOS + Windows + Linux. Modules pin the sdk with
-`require github.com/deploymenttheory/weaveplatform-agent/sdk vX.Y.Z`. `go install
+`require github.com/deploymenttheory/weaveplatform-agent-core/sdk vX.Y.Z`. `go install
 …/cmd/weavectl@vX` is not supported — the root `go.mod` carries a `replace`, which `go install
 pkg@version` refuses; binaries ship as goreleaser archives and the deb.
 

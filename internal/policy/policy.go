@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/retry"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/hostserv"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/retry"
 )
 
 // cacheNamespace is the store namespace policy documents cache under. It

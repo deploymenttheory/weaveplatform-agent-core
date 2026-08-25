@@ -10,10 +10,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/core"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/verify"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/version"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/wlog"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/core"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/verify"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/version"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/wlog"
 )
 
 func main() {

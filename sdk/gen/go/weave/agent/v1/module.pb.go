@@ -520,8 +520,8 @@ const file_weave_agent_v1_module_proto_rawDesc = "" +
 	"\x05Start\x12\x1c.weave.agent.v1.StartRequest\x1a\x1d.weave.agent.v1.StartResponse\x12A\n" +
 	"\x04Stop\x12\x1b.weave.agent.v1.StopRequest\x1a\x1c.weave.agent.v1.StopResponse\x12G\n" +
 	"\x06Health\x12\x1d.weave.agent.v1.HealthRequest\x1a\x1e.weave.agent.v1.HealthResponse\x12M\n" +
-	"\bShutdown\x12\x1f.weave.agent.v1.ShutdownRequest\x1a .weave.agent.v1.ShutdownResponseB\xce\x01\n" +
-	"\x12com.weave.agent.v1B\vModuleProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"\bShutdown\x12\x1f.weave.agent.v1.ShutdownRequest\x1a .weave.agent.v1.ShutdownResponseB\xd3\x01\n" +
+	"\x12com.weave.agent.v1B\vModuleProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_module_proto_rawDescOnce sync.Once

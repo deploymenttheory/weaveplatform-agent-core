@@ -21,10 +21,10 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/eventbus"
-	agentv1 "github.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/handshake"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/werror"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/eventbus"
+	agentv1 "github.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/handshake"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/werror"
 )
 
 // grpcErr maps a backend error to a gRPC status, translating werror

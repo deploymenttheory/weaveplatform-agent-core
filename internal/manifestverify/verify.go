@@ -8,7 +8,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/manifest"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/manifest"
 )
 
 // Bundle is everything a signed channel manifest travels with.

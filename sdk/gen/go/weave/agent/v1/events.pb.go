@@ -252,8 +252,8 @@ const file_weave_agent_v1_events_proto_rawDesc = "" +
 	"\x06topics\x18\x01 \x03(\tR\x06topics2\xa5\x01\n" +
 	"\x0fEventBusService\x12J\n" +
 	"\aPublish\x12\x1e.weave.agent.v1.PublishRequest\x1a\x1f.weave.agent.v1.PublishResponse\x12F\n" +
-	"\tSubscribe\x12 .weave.agent.v1.SubscribeRequest\x1a\x15.weave.agent.v1.Event0\x01B\xce\x01\n" +
-	"\x12com.weave.agent.v1B\vEventsProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"\tSubscribe\x12 .weave.agent.v1.SubscribeRequest\x1a\x15.weave.agent.v1.Event0\x01B\xd3\x01\n" +
+	"\x12com.weave.agent.v1B\vEventsProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_events_proto_rawDescOnce sync.Once

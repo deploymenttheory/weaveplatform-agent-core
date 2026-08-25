@@ -5,7 +5,7 @@ implements. A nested Go module of the agent repository, tagged `sdk/vX.Y.Z`, so 
 pin it independently of core's releases:
 
 ```
-require github.com/deploymenttheory/weaveplatform-agent/sdk vX.Y.Z
+require github.com/deploymenttheory/weaveplatform-agent-core/sdk vX.Y.Z
 ```
 
 Depends only on infrastructure (grpc, protobuf, x/sys, go-winio). `CGO_ENABLED=0`

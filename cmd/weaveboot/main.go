@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/layout"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/verify"
-	"github.com/deploymenttheory/weaveplatform-agent/internal/weaveboot"
-	"github.com/deploymenttheory/weaveplatform-agent/sdk/wlog"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/layout"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/verify"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/weaveboot"
+	"github.com/deploymenttheory/weaveplatform-agent-core/sdk/wlog"
 )
 
 func main() {

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/deploymenttheory/weaveplatform-agent/internal/hostserv"
+	"github.com/deploymenttheory/weaveplatform-agent-core/internal/hostserv"
 )
 
 // storeNamespace is the core-owned store namespace for identity state.

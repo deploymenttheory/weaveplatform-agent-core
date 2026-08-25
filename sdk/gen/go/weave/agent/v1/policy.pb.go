@@ -187,8 +187,8 @@ const file_weave_agent_v1_policy_proto_rawDesc = "" +
 	"\fcontent_type\x18\x04 \x01(\tR\vcontentType2\xa7\x01\n" +
 	"\rPolicyService\x12G\n" +
 	"\x03Get\x12 .weave.agent.v1.PolicyGetRequest\x1a\x1e.weave.agent.v1.PolicyDocument\x12M\n" +
-	"\x05Watch\x12\".weave.agent.v1.PolicyWatchRequest\x1a\x1e.weave.agent.v1.PolicyDocument0\x01B\xce\x01\n" +
-	"\x12com.weave.agent.v1B\vPolicyProtoP\x01ZQgithub.com/deploymenttheory/weaveplatform-agent/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
+	"\x05Watch\x12\".weave.agent.v1.PolicyWatchRequest\x1a\x1e.weave.agent.v1.PolicyDocument0\x01B\xd3\x01\n" +
+	"\x12com.weave.agent.v1B\vPolicyProtoP\x01ZVgithub.com/deploymenttheory/weaveplatform-agent-core/sdk/gen/go/weave/agent/v1;agentv1\xa2\x02\x03WAX\xaa\x02\x0eWeave.Agent.V1\xca\x02\x0eWeave\\Agent\\V1\xe2\x02\x1aWeave\\Agent\\V1\\GPBMetadata\xea\x02\x10Weave::Agent::V1b\x06proto3"
 
 var (
 	file_weave_agent_v1_policy_proto_rawDescOnce sync.Once
