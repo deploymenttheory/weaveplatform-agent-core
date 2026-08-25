@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2](https://github.com/deploymenttheory/weaveplatform-agent-core/compare/v0.2.1...v0.2.2) (2026-08-25)
+
+
+### Bug Fixes
+
+* **cloudinit:** the seed builder takes a VM name, not a channel key path ([8c88838](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/8c888385117f04b62abe410921dfb35935422f6a))
+* **cloudinit:** the seed builder takes a VM name, not a channel key path ([e63aa17](https://github.com/deploymenttheory/weaveplatform-agent-core/commit/e63aa170874d0b0f50bfce67bacab7417060b405))
+
 ## [0.2.1](https://github.com/deploymenttheory/weaveplatform-agent/compare/v0.2.0...v0.2.1) (2026-08-14)
 
 
