@@ -33,7 +33,7 @@ jobs:
     # The fallback keeps releases working where the App is not installed or
     # its private key is not yet provisioned: continue-on-error means a
     # missing key costs a skipped step, not a failed release.
-    - uses: actions/create-github-app-token@v2
+    - uses: actions/create-github-app-token@v3
       id: app-token
       if: ${{ vars.RP_APP_ID != '' }}
       continue-on-error: true
