@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/deploymenttheory/go-bindings-wmi v1.0.0
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
