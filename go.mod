@@ -6,7 +6,7 @@ require (
 	github.com/deploymenttheory/go-bindings-win32 v0.5.0
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/sys v0.48.0
-	golang.org/x/term v0.45.0
+	golang.org/x/term v0.46.0
 	google.golang.org/grpc v1.83.2
 )
 
